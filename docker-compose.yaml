@@ -1,0 +1,54 @@
+name: subgen
+
+services:
+  subgen:
+    image: ${SUBGEN_IMAGE:-ghcr.io/OWNER/subgen:latest}
+    container_name: subgen
+    restart: unless-stopped
+
+    # The process writes files using the host user's identity, never as root.
+    user: "${PUID:-1000}:${PGID:-1000}"
+
+    # Grant the single unified image access to every NVIDIA GPU.
+    # NVIDIA Container Toolkit must be installed on the Linux host.
+    gpus: all
+
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SUBGEN_CONFIG_DIR: /config
+      SUBGEN_MODEL_DIR: /models
+      SUBGEN_MEDIA_ROOT: /media
+      SUBGEN_WHISPER_DEVICE: auto
+      HOME: /config
+      HF_HOME: /models/huggingface
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    # Keep this bound to localhost when a reverse proxy is on the same host.
+    ports:
+      - "${SUBGEN_BIND_ADDRESS:-127.0.0.1}:${SUBGEN_PORT:-8080}:8080"
+
+    volumes:
+      - ${SUBGEN_CONFIG_PATH:-./data/config}:/config
+      - ${SUBGEN_MODEL_PATH:-./data/models}:/models
+
+      # This parent directory can contain unlimited library folders.
+      # Add /media/movies, /media/tv, etc. through the SubGen web interface.
+      - ${SUBGEN_MEDIA_PATH:-./media}:/media
+
+      # Unrelated folders can be added directly. Examples:
+      # - /srv/movies:/media/movies
+      # - /mnt/nas/tv:/media/tv
+      # - /mnt/archive/anime:/media/anime
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:size=2G,uid=${PUID:-1000},gid=${PGID:-1000},mode=1770
+

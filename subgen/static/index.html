@@ -1,0 +1,6 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>SubGen</title><link rel="stylesheet" href="/static/style.css"></head><body>
+<header><h1>SubGen</h1><span>Offline media subtitles</span><button onclick="logout()">Sign out</button></header><main>
+<section id="stats" class="cards"></section>
+<section><h2>Libraries</h2><form id="library"><input name="name" placeholder="Movies" required><input name="path" placeholder="/media/movies" required><input name="languages" placeholder="ar,en" value="ar" required><fieldset><label><input type="checkbox" name="format" value="srt" checked>SRT</label><label><input type="checkbox" name="format" value="ass">ASS</label><label><input type="checkbox" name="format" value="vtt">WebVTT</label></fieldset><button>Add library</button></form><div id="libraries"></div></section>
+<section><h2>Recent jobs</h2><table><thead><tr><th>Media</th><th>Language</th><th>Format</th><th>Status</th><th>Message</th><th></th></tr></thead><tbody id="jobs"></tbody></table></section>
+</main><script src="/static/app.js"></script></body></html>
