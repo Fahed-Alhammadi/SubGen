@@ -4,11 +4,7 @@ import threading
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-import pysubs2
-import torch
-from faster_whisper import WhisperModel
 from sqlalchemy import select
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 from .config import get_settings
 from .db import Job, JobStatus, SessionLocal, utcnow
@@ -25,6 +21,9 @@ NLLB_CODES = {
 
 class Pipeline:
     def __init__(self) -> None:
+        import torch
+        from faster_whisper import WhisperModel
+
         self.settings = get_settings()
         requested = self.settings.whisper_device
         self.device = "cuda" if requested == "auto" and torch.cuda.is_available() else requested
@@ -46,6 +45,8 @@ class Pipeline:
 
     def _translator(self):
         if self.translator_model is None:
+            from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
             location = self.settings.model_dir / "translation" / self.settings.translation_model
             model_ref = str(location) if location.exists() else self.settings.translation_model
             self.translator_tokenizer = AutoTokenizer.from_pretrained(
@@ -76,6 +77,8 @@ class Pipeline:
         return result
 
     def run(self, job: Job) -> Path:
+        import pysubs2
+
         media_path = Path(job.media.path)
         segments, info = self.whisper.transcribe(
             str(media_path), beam_size=5, vad_filter=True, condition_on_previous_text=False
