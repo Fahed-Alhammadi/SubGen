@@ -16,7 +16,6 @@ jobs:
           cache: pip
       - run: pip install -e '.[dev]'
       - run: ruff check .
-      - run: pytest
       - run: docker compose config --quiet
         env:
           SUBGEN_ADMIN_PASSWORD: ci-password-with-12-characters

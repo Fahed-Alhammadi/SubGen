@@ -93,8 +93,8 @@ the requirement: SubGen always creates an external sidecar for every configured 
 
 ## Publishing
 
-The release workflow publishes the single image to `ghcr.io/<owner>/<repository>` for version
-tags such as `v0.1.0`. Replace `OWNER` in `.env` after publishing. CUDA currently limits the
+The release workflow publishes the single image as `ghcr.io/fahed-alhammadi/subgen:x.y.z` for Git
+tags such as `v0.1.0`. It also publishes major/minor and `latest` aliases. CUDA currently limits the
 unified release image to `linux/amd64`; ARM64 can be added when an equivalent unified runtime is
 validated.
 

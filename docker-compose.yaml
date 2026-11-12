@@ -2,7 +2,7 @@ name: subgen
 
 services:
   subgen:
-    image: ${SUBGEN_IMAGE:-ghcr.io/OWNER/subgen:latest}
+    image: ${SUBGEN_IMAGE:-ghcr.io/fahed-alhammadi/subgen:latest}
     container_name: subgen
     restart: unless-stopped
 
