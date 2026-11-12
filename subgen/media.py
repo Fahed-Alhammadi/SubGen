@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import Job, JobStatus, Library, Media
-from .paths import SUBTITLE_EXTENSIONS, confined_path, sidecar_path
+from .paths import confined_path, sidecar_path
 
 MEDIA_EXTENSIONS = {".mkv", ".mp4", ".m4v", ".avi", ".mov", ".ts", ".webm"}
 def validate_library_path(raw_path: str) -> Path:
