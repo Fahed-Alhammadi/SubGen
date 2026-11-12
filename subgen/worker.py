@@ -9,22 +9,16 @@ from sqlalchemy import select
 from .config import get_settings
 from .db import Job, JobStatus, SessionLocal, utcnow
 from .paths import sidecar_path
+from .providers import HuggingFaceTranslator, LibreTranslateTranslator, OllamaTranslator, Translator
+from .settings_store import all_values
 
 logger = logging.getLogger(__name__)
-NLLB_CODES = {
-    "ar": "arb_Arab", "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn",
-    "de": "deu_Latn", "it": "ita_Latn", "pt": "por_Latn", "ru": "rus_Cyrl",
-    "tr": "tur_Latn", "zh": "zho_Hans", "ja": "jpn_Jpan", "ko": "kor_Hang",
-    "hi": "hin_Deva", "fa": "pes_Arab", "ur": "urd_Arab", "nl": "nld_Latn",
-}
-
-
 class Pipeline:
-    def __init__(self) -> None:
+    def __init__(self, values: dict[str, str]) -> None:
         import torch
         from faster_whisper import WhisperModel
 
-        self.settings = get_settings()
+        self.settings, self.values = get_settings(), values
         requested = self.settings.whisper_device
         self.device = "cuda" if requested == "auto" and torch.cuda.is_available() else requested
         if self.device == "auto":
@@ -33,48 +27,29 @@ class Pipeline:
         if compute == "auto":
             compute = "float16" if self.device == "cuda" else "int8"
         logger.info("Inference device=%s compute_type=%s", self.device, compute)
+        whisper_location = self.settings.model_dir / "whisper" / values["transcription_model"]
+        whisper_ref = str(whisper_location) if whisper_location.exists() else values["transcription_model"]
         self.whisper = WhisperModel(
-            self.settings.whisper_model,
+            whisper_ref,
             device=self.device,
             compute_type=compute,
             download_root=str(self.settings.model_dir / "whisper"),
             local_files_only=True,
         )
-        self.translator_model = None
-        self.translator_tokenizer = None
+        self.translator = self._build_translator()
 
-    def _translator(self):
-        if self.translator_model is None:
-            from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
-            location = self.settings.model_dir / "translation" / self.settings.translation_model
-            model_ref = str(location) if location.exists() else self.settings.translation_model
-            self.translator_tokenizer = AutoTokenizer.from_pretrained(
-                model_ref, local_files_only=True
+    def _build_translator(self) -> Translator:
+        provider = self.values["translation_provider"]
+        if provider == "ollama":
+            return OllamaTranslator(self.values["ollama_url"], self.values["ollama_model"])
+        if provider == "libretranslate":
+            return LibreTranslateTranslator(
+                self.values["libretranslate_url"], self.values["libretranslate_api_key"]
             )
-            self.translator_model = AutoModelForSeq2SeqLM.from_pretrained(
-                model_ref, local_files_only=True
-            ).to(self.device)
-        return self.translator_tokenizer, self.translator_model
-
-    def translate(self, texts: list[str], source: str, target: str) -> list[str]:
-        if source == target:
-            return texts
-        if source not in NLLB_CODES or target not in NLLB_CODES:
-            raise ValueError(f"Unsupported offline translation pair: {source} -> {target}")
-        tokenizer, model = self._translator()
-        tokenizer.src_lang = NLLB_CODES[source]
-        result: list[str] = []
-        for offset in range(0, len(texts), 16):
-            batch = texts[offset : offset + 16]
-            inputs = tokenizer(batch, return_tensors="pt", padding=True, truncation=True).to(
-                self.device
-            )
-            generated = model.generate(
-                **inputs, forced_bos_token_id=tokenizer.convert_tokens_to_ids(NLLB_CODES[target])
-            )
-            result.extend(tokenizer.batch_decode(generated, skip_special_tokens=True))
-        return result
+        location = self.settings.model_dir / "translation" / self.values["translation_model"]
+        if not location.exists():
+            raise FileNotFoundError(f"Local translation model is not installed: {self.values['translation_model']}")
+        return HuggingFaceTranslator(str(location), self.device)
 
     def run(self, job: Job) -> Path:
         import pysubs2
@@ -85,7 +60,9 @@ class Pipeline:
         )
         materialized = list(segments)
         source = (info.language or "en").split("-")[0]
-        texts = self.translate([segment.text.strip() for segment in materialized], source, job.language)
+        texts = self.translator.translate(
+            [segment.text.strip() for segment in materialized], source, job.language
+        )
         subtitles = pysubs2.SSAFile()
         for segment, text in zip(materialized, texts, strict=True):
             subtitles.append(
@@ -107,6 +84,7 @@ class Pipeline:
 
 def worker_loop(stop: threading.Event) -> None:
     pipeline: Pipeline | None = None
+    signature: tuple[tuple[str, str], ...] | None = None
     while not stop.is_set():
         with SessionLocal() as db:
             job = db.scalar(
@@ -118,7 +96,10 @@ def worker_loop(stop: threading.Event) -> None:
             job.status, job.started_at, job.progress = JobStatus.PROCESSING, utcnow(), 5
             db.commit()
             try:
-                pipeline = pipeline or Pipeline()
+                values = all_values(db)
+                current_signature = tuple(sorted(values.items()))
+                if pipeline is None or current_signature != signature:
+                    pipeline, signature = Pipeline(values), current_signature
                 output = pipeline.run(job)
                 job.status, job.progress = JobStatus.COMPLETED, 100
                 job.output_path, job.finished_at = str(output), utcnow()

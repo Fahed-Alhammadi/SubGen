@@ -34,6 +34,9 @@ One unified container image supports CPU and NVIDIA GPU execution.
 - Sidecar names such as `Movie Name.ar.srt`
 - Scheduled scans and protection from processing files still being copied
 - Atomic writes, regeneration, and audited subtitle deletion
+- Built-in Hugging Face model downloads, selection, inventory, and deletion
+- Pluggable local translation through Hugging Face, Ollama, or LibreTranslate
+- Provider connection tests and persistent pipeline settings
 - Environment-configured administrator account
 - Non-root UID/GID execution and reverse-proxy-friendly networking
 
@@ -98,13 +101,13 @@ Open `http://127.0.0.1:8080` or route the service through an HTTPS reverse proxy
 Releases are published through GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/fahed-alhammadi/subgen:0.1.2
+docker pull ghcr.io/fahed-alhammadi/subgen:0.2.0
 ```
 
 The release workflow publishes these aliases:
 
 ```text
-ghcr.io/fahed-alhammadi/subgen:0.1.2
+ghcr.io/fahed-alhammadi/subgen:0.2.0
 ghcr.io/fahed-alhammadi/subgen:0.1
 ghcr.io/fahed-alhammadi/subgen:0
 ghcr.io/fahed-alhammadi/subgen:latest
@@ -143,9 +146,13 @@ All mounts must be writable because subtitles are stored beside the media.
 NFS and SMB shares may be mounted by the host or declared as Compose volumes. Never commit network
 share credentials; use a protected credentials file or Docker secrets.
 
-## Offline models
+## Model management
 
-SubGen blocks runtime Hugging Face downloads. Prepare the model directory before processing:
+The **Model vault** in the web interface can download, list, select, and delete Hugging Face models.
+Downloads occur only when an administrator explicitly starts one. Transcription and translation
+jobs always load models from persistent local storage and never download them implicitly.
+
+Models use this directory layout:
 
 ```text
 data/models/
@@ -158,13 +165,24 @@ data/models/
 Default settings:
 
 ```env
-SUBGEN_WHISPER_MODEL=small
+SUBGEN_WHISPER_MODEL=Systran/faster-whisper-small
 SUBGEN_WHISPER_DEVICE=auto
 SUBGEN_WHISPER_COMPUTE_TYPE=auto
 SUBGEN_TRANSLATION_MODEL=facebook/nllb-200-distilled-600M
 ```
 
 If a required model is missing, the job fails visibly instead of sending content externally.
+
+## Translation providers
+
+Configure and test providers from **Provider studio**:
+
+- **Hugging Face:** dedicated translation models stored locally under `/models`
+- **Ollama:** open-source LLMs through the Ollama `/api/chat` API with validated structured output
+- **LibreTranslate:** a local or private LibreTranslate HTTP API
+
+SubGen remains offline-first. Ollama and LibreTranslate default to Compose-network hostnames; no
+public translation service is enabled automatically.
 
 ## Subtitle naming
 
@@ -217,8 +235,7 @@ Work remaining before a stable `1.0` release includes:
 
 - CSRF protection, login throttling, trusted proxy enforcement, session revocation, and TOTP
 - Formal database migrations and integrated backup/restore
-- Model installation and validation tooling
-- Richer settings, audit, preview, and library management interfaces
+- Subtitle preview/editor and expanded audit history interfaces
 - Duration-based progress, priorities, and cancellation
 - Wider language mappings and real-media integration validation
 - NVIDIA testing on a dedicated self-hosted runner

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     scan_interval_minutes: int = 30
     stable_file_seconds: int = 60
     worker_poll_seconds: int = 3
-    whisper_model: str = "small"
+    whisper_model: str = "Systran/faster-whisper-small"
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"
     translation_model: str = "facebook/nllb-200-distilled-600M"

@@ -1,8 +1,7 @@
 # One image supports both CPU and NVIDIA execution. CUDA libraries add size but avoid split tags.
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04 AS runtime
 ARG TARGETARCH
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
-    HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update && apt-get install -y --no-install-recommends python3.12 python3-pip ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app

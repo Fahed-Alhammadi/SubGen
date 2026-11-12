@@ -32,7 +32,7 @@ class Library(Base):
     formats: Mapped[str] = mapped_column(String(100), default="srt")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    media: Mapped[list["Media"]] = relationship(cascade="all, delete-orphan")
+    media: Mapped[list["Media"]] = relationship(back_populates="library", cascade="all, delete-orphan")
 
 
 class Media(Base):
@@ -43,7 +43,8 @@ class Media(Base):
     size: Mapped[int] = mapped_column(Integer)
     mtime_ns: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    jobs: Mapped[list["Job"]] = relationship(cascade="all, delete-orphan")
+    library: Mapped[Library] = relationship(back_populates="media")
+    jobs: Mapped[list["Job"]] = relationship(back_populates="media", cascade="all, delete-orphan")
 
 
 class Job(Base):
@@ -59,7 +60,7 @@ class Job(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    media: Mapped[Media] = relationship()
+    media: Mapped[Media] = relationship(back_populates="jobs")
 
 
 class AuditEvent(Base):
@@ -68,6 +69,13 @@ class AuditEvent(Base):
     action: Mapped[str] = mapped_column(String(100))
     target: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 settings = get_settings()

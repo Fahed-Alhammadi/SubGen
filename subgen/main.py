@@ -1,4 +1,6 @@
 import logging
+import platform
+import shutil
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,8 +14,11 @@ from sqlalchemy import func, select
 from .config import get_settings
 from .db import AuditEvent, Job, JobStatus, Library, Media, SessionLocal, init_db
 from .media import scan_library, validate_library_path
+from .models import delete_model, list_downloads, list_models, search_models, start_download
 from .paths import SUBTITLE_EXTENSIONS, confined_path
+from .providers import test_provider
 from .security import authenticate, require_auth, session_token
+from .settings_store import all_values, set_values
 from .worker import recover_interrupted_jobs, worker_loop
 
 logging.basicConfig(level=get_settings().log_level)
@@ -46,7 +51,7 @@ async def lifespan(_: FastAPI):
     scanner.join(timeout=10)
 
 
-app = FastAPI(title="SubGen", version="0.1.0", lifespan=lifespan, docs_url=None, redoc_url=None)
+app = FastAPI(title="SubGen", version="0.2.0", lifespan=lifespan, docs_url=None, redoc_url=None)
 static_path = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
@@ -56,6 +61,21 @@ class LibraryInput(BaseModel):
     path: str
     languages: list[str]
     formats: list[str]
+
+
+class SettingsInput(BaseModel):
+    transcription_model: str
+    translation_provider: str
+    translation_model: str
+    ollama_url: str
+    ollama_model: str
+    libretranslate_url: str
+    libretranslate_api_key: str = ""
+
+
+class DownloadInput(BaseModel):
+    kind: str
+    repo_id: str
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -107,6 +127,21 @@ def dashboard(_: str = Depends(require_auth)):
         }
 
 
+@app.get("/api/system")
+def system(_: str = Depends(require_auth)):
+    settings = get_settings()
+    settings.model_dir.mkdir(parents=True, exist_ok=True)
+    usage = shutil.disk_usage(settings.model_dir)
+    return {
+        "version": app.version,
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "model_dir": str(settings.model_dir),
+        "model_disk_free": usage.free,
+        "device_mode": settings.whisper_device,
+    }
+
+
 @app.get("/api/libraries")
 def libraries(_: str = Depends(require_auth)):
     with SessionLocal() as db:
@@ -130,6 +165,79 @@ def add_library(payload: LibraryInput, _: str = Depends(require_auth)):
         db.add(item)
         db.commit()
         return {"id": item.id}
+
+
+@app.delete("/api/libraries/{library_id}")
+def remove_library(library_id: int, _: str = Depends(require_auth)):
+    with SessionLocal() as db:
+        item = db.get(Library, library_id)
+        if not item:
+            raise HTTPException(404, "Library not found")
+        db.add(AuditEvent(action="library.delete", target=item.path))
+        db.delete(item)
+        db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/settings")
+def settings(_: str = Depends(require_auth)):
+    with SessionLocal() as db:
+        return all_values(db)
+
+
+@app.put("/api/settings")
+def update_settings(payload: SettingsInput, _: str = Depends(require_auth)):
+    values = payload.model_dump()
+    if values["translation_provider"] not in {"huggingface", "ollama", "libretranslate"}:
+        raise HTTPException(422, "Unsupported translation provider")
+    with SessionLocal() as db:
+        set_values(db, values)
+        db.add(AuditEvent(action="settings.update", target="pipeline"))
+        db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/providers/{kind}/test")
+def provider_test(kind: str, payload: SettingsInput, _: str = Depends(require_auth)):
+    return test_provider(kind, payload.model_dump())
+
+
+@app.get("/api/models")
+def models(_: str = Depends(require_auth)):
+    return {"installed": list_models(), "downloads": list_downloads()}
+
+
+@app.get("/api/models/search")
+def model_search(q: str, _: str = Depends(require_auth)):
+    try:
+        return search_models(q)
+    except Exception as exc:
+        raise HTTPException(502, f"Hugging Face search failed: {exc}") from exc
+
+
+@app.post("/api/models/download")
+def download_model(payload: DownloadInput, _: str = Depends(require_auth)):
+    try:
+        return start_download(payload.kind, payload.repo_id)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+@app.delete("/api/models/{kind}/{owner}/{name}")
+def remove_model(kind: str, owner: str, name: str, _: str = Depends(require_auth)):
+    repo_id = f"{owner}/{name}"
+    with SessionLocal() as db:
+        values = all_values(db)
+        selected = values["transcription_model"] if kind == "whisper" else values["translation_model"]
+        if selected == repo_id:
+            raise HTTPException(409, "Select a different model before deleting this one")
+        try:
+            delete_model(kind, repo_id)
+        except (ValueError, FileNotFoundError) as exc:
+            raise HTTPException(404, str(exc)) from exc
+        db.add(AuditEvent(action="model.delete", target=f"{kind}:{repo_id}"))
+        db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/libraries/{library_id}/scan")
