@@ -43,7 +43,6 @@ jobs:
         with:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
       - name: Smoke test published image
         run: |
           docker run -d --name subgen-smoke -p 127.0.0.1:18080:8080 \
