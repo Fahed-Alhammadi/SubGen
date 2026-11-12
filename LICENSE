@@ -1,20 +1,21 @@
-SubGen Proprietary License
+Elastic License 2.0 (ELv2)
+
+SPDX-License-Identifier: Elastic-2.0
 
 Copyright (c) 2026 Fahed Alhammadi. All rights reserved.
 
-This software and its source code are proprietary and confidential. No part of
-this software may be copied, modified, distributed, sublicensed, sold, hosted,
-published, or used to create derivative works without prior written permission
-from the copyright holder.
+SubGen is licensed under the Elastic License 2.0. The complete, authoritative
+license terms are available at:
 
-Viewing this source code in its public repository does not grant any license or
-permission to use, reproduce, modify, or distribute it.
+https://www.elastic.co/licensing/elastic-license
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT
-OF, OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+The Elastic License 2.0 permits use, copying, distribution, making available,
+and preparation of derivative works, subject to its conditions and limitations.
+Among other limitations, you may not provide the software to third parties as a
+hosted or managed service that gives access to a substantial set of its features,
+and you may not remove or obscure licensing, copyright, or other notices.
 
-For licensing inquiries, contact the copyright holder through the repository.
+The official Elastic License 2.0 terms linked above are incorporated into this
+notice by reference. If this summary conflicts with those terms, the official
+Elastic License 2.0 terms control.
 

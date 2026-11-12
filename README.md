@@ -3,7 +3,7 @@
 [![CI](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml/badge.svg)](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml)
 [![Container](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml/badge.svg)](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml)
 [![GHCR](https://img.shields.io/badge/GHCR-subgen-blue?logo=docker)](https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen)
-[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
+[![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic--2.0-blue.svg)](LICENSE)
 
 SubGen is an offline-first, self-hosted subtitle generation service for Linux media servers and
 NAS environments. It scans media libraries, transcribes speech directly from media audio,
@@ -215,11 +215,12 @@ Work remaining before a stable `1.0` release includes:
 - Wider language mappings and real-media integration validation
 - NVIDIA testing on a dedicated self-hosted runner
 
-## Legal
+## License
 
-This source is publicly visible but proprietary. No permission is granted to copy, modify,
-distribute, sublicense, sell, host, or create derivative works without prior written permission.
-See the [license notice](LICENSE) for details.
+SubGen is licensed under the [Elastic License 2.0](LICENSE) (`Elastic-2.0`). You may use, copy,
+modify, and redistribute the software subject to its terms. You may not offer SubGen to third
+parties as a hosted or managed service that exposes a substantial set of its functionality, and
+you must preserve its license and copyright notices.
 
 ---
 
