@@ -90,13 +90,13 @@ Open `http://127.0.0.1:8080` or route the service through an HTTPS reverse proxy
 Releases are published through GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/fahed-alhammadi/subgen:0.1.0
+docker pull ghcr.io/fahed-alhammadi/subgen:0.1.2
 ```
 
 The release workflow publishes these aliases:
 
 ```text
-ghcr.io/fahed-alhammadi/subgen:0.1.0
+ghcr.io/fahed-alhammadi/subgen:0.1.2
 ghcr.io/fahed-alhammadi/subgen:0.1
 ghcr.io/fahed-alhammadi/subgen:0
 ghcr.io/fahed-alhammadi/subgen:latest
