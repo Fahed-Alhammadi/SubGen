@@ -1,9 +1,17 @@
-# SubGen
+<div align="center">
 
-[![CI](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml/badge.svg)](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml)
-[![Container](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml/badge.svg)](https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml)
-[![GHCR](https://img.shields.io/badge/GHCR-subgen-blue?logo=docker)](https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen)
-[![License: Elastic-2.0](https://img.shields.io/badge/License-Elastic--2.0-blue.svg)](LICENSE)
+<h1>SubGen</h1>
+
+<p><strong>Offline subtitle generation for self-hosted media libraries</strong></p>
+
+<p>
+  <a href="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml"><img src="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml"><img src="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml/badge.svg" alt="Container build status"></a>
+  <a href="https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen"><img src="https://img.shields.io/badge/GHCR-subgen-blue?logo=docker" alt="GitHub Container Registry"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Elastic--2.0-blue.svg" alt="Elastic License 2.0"></a>
+</p>
+
+</div>
 
 SubGen is an offline-first, self-hosted subtitle generation service for Linux media servers and
 NAS environments. It scans media libraries, transcribes speech directly from media audio,
