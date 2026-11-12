@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy policy | SubGen</title>
+  <meta name="description" content="SubGen is self-hosted. This website and the SubGen application collect no analytics or personal data, and your media stays on your server.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f1f5ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#06100d" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://fahed-alhammadi.github.io/SubGen/privacy.html">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SubGen">
+  <meta property="og:title" content="SubGen privacy policy">
+  <meta property="og:description" content="SubGen is self-hosted. No analytics, no personal data, and your media stays on your server.">
+  <meta property="og:url" content="https://fahed-alhammadi.github.io/SubGen/privacy.html">
+  <meta property="og:image" content="https://fahed-alhammadi.github.io/SubGen/assets/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="./" aria-label="SubGen home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="bm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c6f85e"/><stop offset="1" stop-color="#70df87"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#bm)"/><path d="M21.6 10.1c-1.5-1.8-3.6-2.6-5.9-2.6-3.2 0-5.6 1.7-5.6 4.3 0 2.7 2.4 3.6 5.6 4.3 3.4.7 6 1.9 6 4.9 0 2.8-2.5 4.7-6.1 4.7-2.7 0-5.1-1-6.6-3" fill="none" stroke="#0a190f" stroke-width="3.4" stroke-linecap="round"/></svg>
+        <span>SubGen</span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li class="nav-optional"><a href="./#features">Features</a></li>
+          <li class="nav-optional"><a href="./#faq">FAQ</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen">GitHub</a></li>
+          <li class="nav-cta"><a href="./#install">Install</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <article class="prose">
+      <h1>Privacy policy</h1>
+      <p class="updated">Last updated 12 November 2026</p>
+      <p><strong>SubGen is self-hosted software.</strong> You run it on your own server, and the author does not operate any service that your copy of SubGen reports to. This page covers both this website and the SubGen application.</p>
+
+      <h2>This website</h2>
+      <ul>
+        <li>The website uses no analytics, tracking pixels, advertising, cookies or third-party scripts, and loads no fonts or files from other domains.</li>
+        <li>It has no forms and does not ask for or store any personal data.</li>
+        <li>It is hosted on GitHub Pages. Like any web host, GitHub may process technical request data such as IP addresses to deliver and secure the site. See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a> for details.</li>
+        <li>Links to GitHub and the GitHub Container Registry take you to GitHub, where its own privacy terms apply.</li>
+      </ul>
+
+      <h2>The SubGen application</h2>
+      <ul>
+        <li><strong>No telemetry.</strong> SubGen collects no analytics, usage statistics, crash reports or personal data, and does not contact the author.</li>
+        <li><strong>Your media stays on your server.</strong> Audio is extracted, transcribed and translated inside your container using models stored on your disk.</li>
+        <li><strong>Models download only when you ask.</strong> SubGen contacts Hugging Face only when an administrator installs a model or searches for one in the Model vault. Jobs never download models on their own.</li>
+        <li><strong>External providers are your choice.</strong> If an administrator configures an Ollama or LibreTranslate URL, subtitle text is sent to that address for translation. Nothing is sent to any outside service unless you enter its URL.</li>
+        <li><strong>Data you keep.</strong> The application database stores your libraries, settings, job history, the audit log and session records on your server under <code>/config</code>. Studio uploads are deleted automatically after the retention period you set.</li>
+        <li><strong>Sign-in.</strong> The single administrator account is configured through environment variables. Session cookies are used only to keep you signed in and to protect requests against cross-site forgery.</li>
+      </ul>
+
+      <h2>Your responsibilities as an operator</h2>
+      <p>Because you host SubGen, you control the data it processes. If you make it reachable by other people, use HTTPS, keep your credentials secret, and follow any privacy rules that apply to you.</p>
+
+      <h2>Changes and questions</h2>
+      <p>Changes to this policy are published on this page and in the project's <a href="https://github.com/Fahed-Alhammadi/SubGen">GitHub repository</a>, where you can also open an issue with questions.</p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-row">
+        <a class="brand" href="./" aria-label="SubGen home">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#bbf451"/><path d="M21.6 10.1c-1.5-1.8-3.6-2.6-5.9-2.6-3.2 0-5.6 1.7-5.6 4.3 0 2.7 2.4 3.6 5.6 4.3 3.4.7 6 1.9 6 4.9 0 2.8-2.5 4.7-6.1 4.7-2.7 0-5.1-1-6.6-3" fill="none" stroke="#0a190f" stroke-width="3.4" stroke-linecap="round"/></svg>
+          <span>SubGen</span>
+        </a>
+        <ul class="footer-links">
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen">GitHub</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen">Container image</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen#readme">Documentation</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen/blob/main/LICENSE">License</a></li>
+          <li><a href="privacy.html" aria-current="page">Privacy</a></li>
+        </ul>
+      </div>
+      <p class="legal">© 2026 Fahed Alhammadi. SubGen is licensed under the Elastic License 2.0.</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,160 @@
+/* SubGen design tokens.
+   Identity: true-neutral greys (no hue cast, so video previews and subtitle text are judged
+   against grey, as in an edit suite) with one signal blue reserved for primary actions,
+   selection, focus, progress and the playhead. Status colours are kept distinct from it. */
+
+:root {
+  --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
+    system-ui, Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", "Roboto Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Type scale (px based on 14px UI body) */
+  --fs-xs: 0.75rem;   /* 12 */
+  --fs-sm: 0.8125rem; /* 13 */
+  --fs-md: 0.875rem;  /* 14 */
+  --fs-lg: 1rem;      /* 16 */
+  --fs-xl: 1.25rem;   /* 20 */
+  --fs-2xl: 1.5rem;   /* 24 */
+  --fs-3xl: 2rem;     /* 32 */
+
+  /* Spacing (4px grid) */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.25rem;
+  --s-6: 1.5rem;
+  --s-8: 2rem;
+  --s-10: 2.5rem;
+  --s-12: 3rem;
+
+  /* Radii: controls < panels < dialogs */
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 8px;
+  --r-4: 12px;
+
+  --sidebar-w: 216px;
+  --control-h: 2rem;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 160ms;
+
+  color-scheme: light;
+  /* Light theme */
+  --bg: #f7f7f8;
+  --panel: #ffffff;
+  --raised: #fafafb;
+  --sunken: #efeff1;
+  --line: #e2e2e6;
+  --line-strong: #c9c9d0;
+  --text: #18181b;
+  --text-2: #3f3f46;
+  --muted: #62626a;
+  --faint: #8d8d95;
+
+  --brand: #2563eb;
+  --signal: #2563eb;         /* text-safe on white (5.2:1) */
+  --signal-fill: #3b82f6;    /* progress / playhead fill */
+  --signal-soft: #eaf1fe;
+  --primary-bg: #2563eb;
+  --primary-fg: #ffffff;
+  --primary-hover: #1d4fd8;
+  --focus: #2563eb;
+
+  --info: #0e7490;
+  --info-soft: #e0f4f8;
+  --ok: #13733a;
+  --ok-soft: #e5f5ea;
+  --warn: #a15c07;
+  --warn-soft: #fcf1dc;
+  --danger: #c42525;
+  --danger-soft: #fdeaea;
+  --neutral: #62626a;
+  --neutral-soft: #efeff1;
+
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
+  --backdrop: rgb(10 10 12 / 0.4);
+  --tick: rgb(24 24 27 / 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #161617;
+    --panel: #1e1e20;
+    --raised: #242427;
+    --sunken: #111112;
+    --line: #2f2f33;
+    --line-strong: #45454b;
+    --text: #ededee;
+    --text-2: #c9c9cd;
+    --muted: #9b9ba3;
+    --faint: #6d6d75;
+
+    --brand: #2f6be8;
+    --signal: #6ea2ff;         /* text-safe on panel */
+    --signal-fill: #4c8dff;
+    --signal-soft: #18233a;
+    --primary-bg: #2f6be8;     /* white label 4.6:1 */
+    --primary-fg: #ffffff;
+    --primary-hover: #2860d6;
+    --focus: #6ea2ff;
+
+    --info: #5fcde3;
+    --info-soft: #102b31;
+    --ok: #5ccb8a;
+    --ok-soft: #13291c;
+    --warn: #e5b04a;
+    --warn-soft: #33270f;
+    --danger: #f2726d;
+    --danger-soft: #3a1818;
+    --neutral: #a1a1a9;
+    --neutral-soft: #29292d;
+
+    --shadow-1: 0 1px 0 rgb(0 0 0 / 0.35);
+    --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.4);
+    --backdrop: rgb(0 0 0 / 0.6);
+    --tick: rgb(237 237 238 / 0.09);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #161617;
+  --panel: #1e1e20;
+  --raised: #242427;
+  --sunken: #111112;
+  --line: #2f2f33;
+  --line-strong: #45454b;
+  --text: #ededee;
+  --text-2: #c9c9cd;
+  --muted: #9b9ba3;
+  --faint: #6d6d75;
+
+  --brand: #2f6be8;
+  --signal: #6ea2ff;         /* text-safe on panel */
+  --signal-fill: #4c8dff;
+  --signal-soft: #18233a;
+  --primary-bg: #2f6be8;     /* white label 4.6:1 */
+  --primary-fg: #ffffff;
+  --primary-hover: #2860d6;
+  --focus: #6ea2ff;
+
+  --info: #5fcde3;
+  --info-soft: #102b31;
+  --ok: #5ccb8a;
+  --ok-soft: #13291c;
+  --warn: #e5b04a;
+  --warn-soft: #33270f;
+  --danger: #f2726d;
+  --danger-soft: #3a1818;
+  --neutral: #a1a1a9;
+  --neutral-soft: #29292d;
+
+  --shadow-1: 0 1px 0 rgb(0 0 0 / 0.35);
+  --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.4);
+  --backdrop: rgb(0 0 0 / 0.6);
+  --tick: rgb(237 237 238 / 0.09);
+}

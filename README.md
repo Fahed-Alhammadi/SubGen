@@ -2,7 +2,7 @@
 
 <h1>SubGen</h1>
 
-<p><strong>Offline subtitle generation for self-hosted media libraries</strong></p>
+<p><strong>Private, local subtitle generation for self-hosted media libraries</strong></p>
 
 <p>
   <a href="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml"><img src="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml/badge.svg" alt="CI status"></a>
@@ -11,68 +11,99 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Elastic--2.0-blue.svg" alt="Elastic License 2.0"></a>
 </p>
 
+<p><a href="https://fahed-alhammadi.github.io/SubGen/">Website</a> · <a href="#quick-start">Quick start</a> · <a href="docs/API.md">API reference</a></p>
+
 </div>
 
-SubGen is an offline-first, self-hosted subtitle generation service for Linux media servers and
-NAS environments. It scans media libraries, transcribes speech directly from media audio,
-translates it locally when needed, and writes subtitle sidecars beside the source files.
+SubGen watches your media libraries, transcribes speech with
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper), translates it with local models, and
+writes readable subtitle sidecars (`Movie (2024).ar.srt`) beside each file. Everything runs on your own
+server. One container image works on CPU and NVIDIA GPUs.
 
-One unified container image supports CPU and NVIDIA GPU execution.
+![SubGen overview dashboard](screenshots/web/dashboard.png)
 
-> **Status:** Active pre-1.0 development. Pin a versioned image, keep backups, and review the
-> [current limitations](#current-limitations) before using SubGen with irreplaceable libraries.
+> **Status:** active pre-1.0 development. Pin a versioned image, keep backups, and check results on a
+> few representative files before processing an irreplaceable library unattended.
 
 ## Features
 
-- Web dashboard with persistent media inventory and restart-safe jobs
-- Unlimited media libraries and multiple target languages per library
-- SRT, ASS, and WebVTT output
-- Direct audio transcription using `faster-whisper`
-- Fully local Hugging Face translation with no implicit runtime downloads
-- One CPU/CUDA-capable image with automatic device selection
-- Local disk, NFS, and SMB/CIFS support
-- Sidecar names such as `Movie Name.ar.srt`
-- Scheduled scans and protection from processing files still being copied
-- Atomic writes, regeneration, and audited subtitle deletion
-- Built-in Hugging Face model downloads, selection, inventory, and deletion
-- Pluggable local translation through Hugging Face, Ollama, or LibreTranslate
-- Provider connection tests and persistent pipeline settings
-- Duration-based job progress, queue priorities, cancellation, retry, and regeneration
-- Built-in subtitle preview/editor with atomic saves
-- Searchable administrative audit history and integrated database backup/restore
-- CSRF protection, login throttling, session revocation, security headers, and optional TOTP
-- Environment-configured administrator account
-- Non-root UID/GID execution and reverse-proxy-friendly networking
+**Subtitle quality**
+- Word-timestamp re-segmentation: every cue respects max characters per line, max lines, and minimum
+  and maximum on-screen time. Breaks prefer sentence ends, clauses and pauses.
+- Balanced two-line wrapping with CJK/Thai awareness, minimum gaps, no overlaps, and a short linger
+  after speech.
+- Hallucination filtering removes "Thanks for watching", subtitle credits and repetition loops
+  invented by Whisper during silence or music.
+- Translation runs on sentence-sized units and is redistributed across the original cue timings, so
+  translated subtitles stay in sync.
 
-## Architecture
+**Fast and local**
+- Transcribe once, translate many: transcripts are cached, so extra languages and formats skip
+  Whisper entirely. Formats of the same language are written together.
+- Batched GPU inference (3–6× faster on NVIDIA). CPU int8 inference on any x86-64 server.
+- Local translation with NLLB-200, M2M100 or Marian/OPUS-MT models, or self-hosted Ollama /
+  LibreTranslate. Nothing is sent to a cloud service.
+
+**Libraries**
+- Unlimited libraries, each with its own target languages and SRT / ASS / WebVTT formats.
+- Skips languages that already have subtitles: external sidecars in any common naming
+  (`Movie.eng.srt`, `Movie.English.sdh.srt`) and, optionally, embedded tracks.
+- Picks the right audio track in multi-audio files by language preference and passes its language
+  tag to Whisper.
+- Ignore patterns (`sample, trailer`), protection for files still being copied, safe pruning of
+  deleted media that never wipes an unmounted share.
+
+**Tools**
+- **Studio:** drag and drop any video or audio file and download subtitles. No library needed.
+- **Subtitle editor:** video preview with live captions, timecode editing, split/merge, timing shift,
+  find & replace, and readability warnings (reading speed, line length, overlaps).
+- **Model vault:** one-click recommended models, Hugging Face search, download progress.
+- **Queue:** filters, search, priorities, bulk cancel/retry/clear, per-file generation with
+  audio-track and language overrides.
+- Settings editor generated from the backend's settings schema, provider connection tests, an audit
+  log, and database backup and restore.
+
+**Security**
+- Single administrator with Argon2 password hashing, optional TOTP, login throttling, and session
+  revocation.
+- CSRF tokens on every mutation, a strict Content-Security-Policy (no inline scripts or styles), and
+  path confinement for every file operation.
+- Runs as a non-root UID/GID with all capabilities dropped and `no-new-privileges`.
+
+## Screenshots
+
+| Studio | Subtitle editor |
+| --- | --- |
+| ![Studio upload and generation](screenshots/web/studio.png) | ![Subtitle editor with video preview](screenshots/web/editor.png) |
+| **Library browser** | **Models** |
+| ![Library media browser](screenshots/web/library.png) | ![Model vault](screenshots/web/models.png) |
+
+## How it works
 
 ```text
-Browser
-   |
-HTTPS reverse proxy
-   |
-SubGen container
-   |-- Web interface and API
-   |-- Media scanner
-       |-- Migrated SQLite job queue and audit log
-   |-- faster-whisper transcription
-   |-- Local NLLB translation
-   `-- Subtitle writer
-            |
-       Media libraries
+media file ─► ffprobe ─► choose audio track ─► ffmpeg (16 kHz mono)
+           ─► faster-whisper (word timestamps, VAD) ──► transcript cache
+           ─► clean hallucinations ─► re-segment into readable cues
+           ─► translate sentence units (if target ≠ spoken language)
+           ─► balance lines, fix timing ─► atomic write: Movie.ar.srt / .ass / .vtt
 ```
 
-SubGen always transcribes the media audio. Existing and embedded subtitles are not used as a
-transcription source. Every configured language and format produces an external sidecar.
+```text
+Browser ──HTTPS──► reverse proxy ──► SubGen container
+                                      ├─ Web UI + JSON API (FastAPI)
+                                      ├─ Scheduler (library scans, upload expiry)
+                                      ├─ Worker (one job at a time, models kept loaded)
+                                      └─ SQLite (jobs, settings, transcripts, audit)
+                                             │
+                          /media (libraries)  /models  /config
+```
 
 ## Requirements
 
-- Linux with Docker Engine and Docker Compose v2
-- Write permission for every configured media library
-- Enough persistent storage for the selected transcription and translation models
-- For GPU processing: an NVIDIA GPU, current driver, and NVIDIA Container Toolkit
-
-The published image currently targets `linux/amd64`.
+- Linux with Docker Engine and Docker Compose v2 (`linux/amd64` image)
+- Write permission for every media library (subtitles are stored beside the media)
+- Disk space for models: about 0.5 GB (Whisper Small) to 3 GB (Large v3), plus 2.5 GB for NLLB-200
+- For GPU processing: an NVIDIA GPU, a current driver, and the NVIDIA Container Toolkit
 
 ## Quick start
 
@@ -84,7 +115,7 @@ mkdir -p data/config data/models media
 chown -R 1000:1000 data media
 ```
 
-Change the required credentials in `.env`:
+Set the required credentials in `.env`:
 
 ```env
 SUBGEN_ADMIN_USERNAME=admin
@@ -98,56 +129,86 @@ Generate a signing key with `openssl rand -hex 32`, then start SubGen:
 docker compose up -d
 ```
 
-Open `http://127.0.0.1:8080`, sign in with the credentials from `.env`, and use **Model vault**
-to install the models you want. For remote access, route SubGen through an HTTPS reverse proxy.
+Open `http://127.0.0.1:8080` and sign in. When testing over plain HTTP on a LAN, set
+`SUBGEN_SECURE_COOKIES=false`; keep it `true` behind HTTPS.
 
-### First-run checklist
+### First run
 
-1. Open **Models** and download a Whisper transcription model.
-2. Download a translation model if you intend to use the local Hugging Face provider.
-3. Open **Providers**, choose the transcription and translation models, configure the translation
-   provider, test it, and save the pipeline settings.
-4. Open **Libraries**, add each mounted container path with its target languages and output
-   formats, then select **Scan now**.
-5. Follow queued, active, completed, and failed jobs from **Overview**.
+1. **Models:** install a Whisper model (Small for CPU, Large v3 Turbo for GPU). Install NLLB-200 600M
+   if you want subtitles in a language other than the spoken one.
+2. **Studio:** drop a short clip to check quality before touching your library.
+3. **Libraries:** add each mounted folder (the folder picker browses `/media`), choose target
+   languages and formats, and select **Scan**.
+4. **Queue / Overview:** follow progress, speed and ETA. Use **Edit** on any finished subtitle.
 
-Model downloads can be large. Keep the Models page open to monitor transfer status; models are
-stored persistently below the configured `SUBGEN_MODEL_PATH`.
+## Models
 
-## Container image
+The **Models** page lists recommended models with one-click install:
 
-Releases are published through GitHub Container Registry:
+| Model | Kind | Size | Notes |
+| --- | --- | --- | --- |
+| `Systran/faster-whisper-small` | Whisper | 0.5 GB | Balanced CPU default |
+| `mobiuslabsgmbh/faster-whisper-large-v3-turbo` | Whisper | 1.6 GB | Recommended on NVIDIA GPUs |
+| `Systran/faster-whisper-large-v3` | Whisper | 3.1 GB | Best multilingual accuracy |
+| `facebook/nllb-200-distilled-600M` | Translation | 2.5 GB | 200 languages, default |
+| `facebook/m2m100_418M` | Translation | 1.9 GB | Lighter, 100 languages |
+| `Helsinki-NLP/opus-mt-*` | Translation | 0.3 GB | Fast single-pair models |
 
-```bash
-docker pull ghcr.io/fahed-alhammadi/subgen:0.3.1
-```
-
-The release workflow publishes these aliases:
+Any CTranslate2 Whisper repository or Transformers seq2seq translation repository on Hugging Face can
+be installed from the search box. Downloads happen only when you start one, skip unused framework
+weights (TensorFlow, Flax, ONNX), and are stored under `SUBGEN_MODEL_PATH`:
 
 ```text
-ghcr.io/fahed-alhammadi/subgen:0.3.1
-ghcr.io/fahed-alhammadi/subgen:0.3
-ghcr.io/fahed-alhammadi/subgen:0
-ghcr.io/fahed-alhammadi/subgen:latest
+data/models/
+├── whisper/Systran/faster-whisper-small/
+└── translation/facebook/nllb-200-distilled-600M/
 ```
+
+Jobs never download models implicitly. If a model is missing, the job fails with a clear message.
+
+## Settings
+
+Pipeline settings are edited in the web UI and stored in the database. Defaults:
+
+| Group | Setting | Default |
+| --- | --- | --- |
+| Transcription | Spoken language | Detect automatically |
+| | Preferred audio tracks | Default track |
+| | Beam size / batch size | 5 / auto (8 on GPU) |
+| | Skip silence (VAD), filter hallucinations | On |
+| | Vocabulary prompt | Empty |
+| Segmentation | Characters per line / lines | 42 / 2 (≈19 for CJK) |
+| | Subtitle duration | 1.0 – 6.0 s, 80 ms gap, 250 ms linger |
+| Translation | Provider | Local Hugging Face model |
+| Scanning | Interval | 30 min |
+| | Skip existing / embedded subtitles | On / Off |
+| | Ignore files containing | `sample, trailer, featurette` |
+| Output | ASS font, UTF-8 BOM for SRT | Arial 56 / Off |
+| Workspace | Keep Studio uploads | 72 h |
+
+Individual jobs can override the spoken language, audio track and vocabulary prompt.
+
+## Translation providers
+
+- **Local Hugging Face:** NLLB-200, M2M100, and Marian/OPUS-MT models from `/models`. Uses the GPU
+  when available.
+- **Ollama:** any local LLM through `/api/chat` with validated JSON output and automatic batch
+  splitting.
+- **LibreTranslate:** a private LibreTranslate server, with batched requests.
+
+When Ollama or LibreTranslate runs in another container, attach both to the same Docker network and
+use the service name in the URL. When it runs directly on the host, use an address reachable from the
+container, not `127.0.0.1`.
 
 ## CPU and NVIDIA GPU
 
-The provided `docker-compose.yaml` enables NVIDIA access:
-
-```yaml
-services:
-  subgen:
-    gpus: all
-```
-
-With `SUBGEN_WHISPER_DEVICE=auto`, SubGen selects CUDA when available. On CPU-only hosts, comment
-out `gpus: all`; the same image will automatically use CPU.
+The provided `docker-compose.yaml` requests every NVIDIA GPU (`gpus: all`). With
+`SUBGEN_WHISPER_DEVICE=auto`, SubGen uses CUDA when a GPU is visible and CPU otherwise. On CPU-only
+hosts, remove `gpus: all`.
 
 ## Multiple media libraries
 
-Every library must be mounted at a unique path below `/media`. A shared parent can contain any
-number of library folders, or unrelated host paths can be mounted separately:
+Mount each library below `/media`:
 
 ```yaml
 services:
@@ -158,53 +219,8 @@ services:
       - /mnt/archive/anime:/media/anime
 ```
 
-Add `/media/movies`, `/media/tv`, and `/media/anime` as separate libraries in the web interface.
-All mounts must be writable because subtitles are stored beside the media.
-
-NFS and SMB shares may be mounted by the host or declared as Compose volumes. Never commit network
-share credentials; use a protected credentials file or Docker secrets.
-
-## Model management
-
-The **Model vault** in the web interface can download, list, select, and delete Hugging Face models.
-Downloads occur only when an administrator explicitly starts one. Transcription and translation
-jobs always load models from persistent local storage and never download them implicitly.
-
-Models use this directory layout:
-
-```text
-data/models/
-├── whisper/
-└── translation/
-    └── facebook/
-        └── nllb-200-distilled-600M/
-```
-
-Default settings:
-
-```env
-SUBGEN_WHISPER_MODEL=Systran/faster-whisper-small
-SUBGEN_WHISPER_DEVICE=auto
-SUBGEN_WHISPER_COMPUTE_TYPE=auto
-SUBGEN_TRANSLATION_MODEL=facebook/nllb-200-distilled-600M
-```
-
-If a required model is missing, the job fails visibly instead of sending content externally.
-
-## Translation providers
-
-Configure and test providers from **Provider studio**:
-
-- **Hugging Face:** dedicated translation models stored locally under `/models`
-- **Ollama:** open-source LLMs through the Ollama `/api/chat` API with validated structured output
-- **LibreTranslate:** a local or private LibreTranslate HTTP API
-
-SubGen remains offline-first. Ollama and LibreTranslate default to Compose-network hostnames; no
-public translation service is enabled automatically.
-
-When Ollama or LibreTranslate runs in a separate container, attach both services to the same
-Docker network and use its service name in the provider URL. When it runs directly on the host,
-use a host address reachable from the SubGen container rather than `127.0.0.1`.
+All mounts must be writable. NFS and SMB shares can be mounted by the host or declared as Compose
+volumes. Keep share credentials out of Git.
 
 ## Subtitle naming
 
@@ -215,38 +231,6 @@ Movie Name (2026).en.vtt
 Movie Name (2026).fr.ass
 ```
 
-## Queue and subtitle editor
-
-The Overview page reports transcription progress against media duration. Queued jobs are processed
-by priority and then creation time. Administrators can reprioritize, cancel, retry, or regenerate a
-job without entering the container.
-
-Completed jobs include an **Edit** action. The editor validates cue timing and text limits, then
-atomically replaces the sidecar so a failed write cannot leave a partial subtitle. Edits,
-regeneration, deletion, queue controls, settings changes, and authentication events appear under
-**Activity**.
-
-## Backup and restore
-
-Use **System → Backup and restore** to download a consistent SQLite snapshot. A validated restore
-is staged inside `/config` and restarts SubGen; the restored database is applied before workers
-start. Backups do not contain media or downloaded models, so protect those separately.
-
-## Security
-
-- Replace all credentials before first launch.
-- Optionally set `SUBGEN_TOTP_SECRET` to a Base32 authenticator secret. When configured, login
-  requires a current six-digit TOTP code.
-- Keep `.env`, media, models, databases, and private tests outside Git.
-- Use HTTPS for remote access and keep the default localhost bind behind a local reverse proxy.
-- The container runs with the configured `PUID`/`PGID`, drops Linux capabilities, enables
-  `no-new-privileges`, and never mounts the Docker socket.
-- Subtitle deletion is restricted to supported files inside configured libraries.
-- Mutating API requests require a session-bound CSRF token. Login attempts are rate limited and
-  logout revokes all outstanding sessions for the single administrator.
-- Forwarded client addresses are honored only from `SUBGEN_TRUSTED_PROXIES`.
-- Back up `/config/subgen.db` and generated subtitles.
-
 ## Configuration
 
 See [.env.example](.env.example) for the full template.
@@ -254,60 +238,97 @@ See [.env.example](.env.example) for the full template.
 | Variable | Purpose |
 | --- | --- |
 | `PUID`, `PGID` | Host filesystem identity |
-| `SUBGEN_ADMIN_USERNAME` | Administrator login |
-| `SUBGEN_ADMIN_PASSWORD` | Administrator password, minimum 12 characters |
-| `SUBGEN_SECRET_KEY` | Session-signing key, minimum 32 characters |
-| `SUBGEN_MEDIA_PATH` | Common host media directory |
-| `SUBGEN_MODEL_PATH` | Offline model directory |
-| `SUBGEN_CONFIG_PATH` | Persistent configuration/database directory |
-| `SUBGEN_WHISPER_DEVICE` | `auto`, `cpu`, or `cuda` |
-| `SUBGEN_WHISPER_COMPUTE_TYPE` | Whisper compute type; `auto` is recommended |
-| `SUBGEN_BIND_ADDRESS`, `SUBGEN_PORT` | Published web interface address and port |
-| `SUBGEN_SECURE_COOKIES` | Require HTTPS session cookies; keep enabled behind HTTPS |
-| `SUBGEN_SESSION_HOURS` | Maximum authenticated session lifetime |
-| `SUBGEN_LOGIN_ATTEMPTS` | Failed attempts allowed within the login window |
-| `SUBGEN_LOGIN_WINDOW_SECONDS` | Login throttling window |
-| `SUBGEN_TRUSTED_PROXIES` | Comma-separated proxy addresses allowed to supply client IPs |
-| `SUBGEN_TOTP_SECRET` | Optional Base32 secret for authenticator-based two-factor login |
+| `SUBGEN_ADMIN_USERNAME`, `SUBGEN_ADMIN_PASSWORD` | Administrator login (password ≥ 12 characters) |
+| `SUBGEN_SECRET_KEY` | Session-signing key (≥ 32 characters) |
+| `SUBGEN_TOTP_SECRET` | Optional Base32 secret for authenticator codes |
+| `SUBGEN_MEDIA_PATH`, `SUBGEN_MODEL_PATH`, `SUBGEN_CONFIG_PATH` | Host directories |
+| `SUBGEN_WHISPER_DEVICE` | `auto`, `cpu` or `cuda` |
+| `SUBGEN_WHISPER_COMPUTE_TYPE` | `auto` (float16 on GPU, int8 on CPU) or any CTranslate2 type |
+| `SUBGEN_MAX_UPLOAD_MB` | Studio upload limit (default 20480) |
+| `SUBGEN_WORKSPACE_DIR` | Studio upload storage (default `/config/workspace`) |
+| `SUBGEN_STABLE_FILE_SECONDS` | Wait before processing recently modified files |
+| `SUBGEN_BIND_ADDRESS`, `SUBGEN_PORT` | Published address and port |
+| `SUBGEN_SECURE_COOKIES` | HTTPS-only cookies (keep enabled behind HTTPS) |
+| `SUBGEN_SESSION_HOURS` | Session lifetime |
+| `SUBGEN_LOGIN_ATTEMPTS`, `SUBGEN_LOGIN_WINDOW_SECONDS` | Login throttling |
+| `SUBGEN_TRUSTED_PROXIES` | Proxies allowed to supply `X-Forwarded-For` |
+
+Reverse proxies must allow large request bodies for Studio uploads (for example
+`client_max_body_size 20g;` in nginx).
+
+## Security
+
+- Replace all credentials before the first launch and use HTTPS for remote access.
+- Mutating API requests require a session-bound CSRF token. Logout revokes all sessions.
+- Every file operation is confined to its library, the media root, or the Studio workspace.
+- The container runs as `PUID`/`PGID`, drops all Linux capabilities, enables `no-new-privileges`, and
+  never mounts the Docker socket.
+- Keep `.env`, media, models and databases out of Git.
+
+## Backup and restore
+
+**System → Backup** downloads a consistent SQLite snapshot (settings, libraries, jobs, transcripts,
+audit log). A restore is validated, staged in `/config`, and applied on restart. Backups do not
+include media, subtitles or models.
 
 ## Updating
-
-Back up `/config`, then run:
 
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-Use an explicit version instead of `latest` for reproducible deployments.
+Database migrations run automatically on start. Pin a version (`ghcr.io/fahed-alhammadi/subgen:0.4`)
+for reproducible deployments.
 
-To stop SubGen without deleting its database, settings, or downloaded models:
+## Project structure
 
-```bash
-docker compose down
+```text
+subgen/
+├── main.py            App assembly, security headers, background loops
+├── api/               HTTP routers (auth, jobs, libraries, media, models, settings, subtitles, system)
+├── pipeline.py        Probe → audio → Whisper (cached) → segment → translate
+├── segmentation.py    Subtitle-quality engine (re-segmentation, wrapping, hallucination filter)
+├── worker.py          Job queue worker
+├── media.py           Library scanning, Studio workspace
+├── providers.py       Translation providers (Hugging Face, Ollama, LibreTranslate)
+├── models.py          Model vault
+├── settings_store.py  Settings schema and validation
+├── languages.py       Language codes, names, NLLB/Whisper mappings
+├── audio.py           ffprobe / ffmpeg
+├── subtitles.py       Sidecar reading, writing and detection
+├── db.py              SQLAlchemy models and migrations
+└── static/            Web UI (no build step, native ES modules)
+docs/API.md            HTTP API reference
+Website/               Project website (GitHub Pages)
 ```
 
-Runtime directories are intentionally ignored by Git. Remove them only when you deliberately want
-to reset the local installation, and back up anything you need first.
+## Development
 
-## Validation and operational boundaries
+```bash
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -e ".[dev]"
+export SUBGEN_ADMIN_PASSWORD=dev-password-123 SUBGEN_SECRET_KEY=$(openssl rand -hex 32) \
+       SUBGEN_SECURE_COOKIES=false SUBGEN_CONFIG_DIR=./data/config SUBGEN_MODEL_DIR=./data/models \
+       SUBGEN_MEDIA_ROOT=./media
+.venv/bin/uvicorn subgen.main:app --reload --port 8080
+.venv/bin/ruff check .
+```
 
-Every release runs linting, Compose validation, Docker build checks, a published-image health smoke
-test, SBOM generation, and signed build-provenance attestation. A manual NVIDIA workflow is included
-for a self-hosted runner labeled `nvidia`; GPU owners can use it to validate CUDA visibility and the
-media runtime against any image tag.
+`ffmpeg` and `ffprobe` must be on `PATH`. The frontend has no build step: edit `subgen/static/` and
+reload.
 
-SubGen now maps more than 60 common language codes for local NLLB translation. Ollama and
-LibreTranslate may support additional pairs depending on the selected model or server. As with any
-speech-recognition system, validate timing and translation quality on representative real media
-before enabling unattended processing across an irreplaceable library.
+## Contributing
+
+Issues and pull requests are welcome. Keep changes focused, run `ruff check .`, describe how you
+tested, and never include credentials, media or model files.
 
 ## License
 
 SubGen is licensed under the [Elastic License 2.0](LICENSE) (`Elastic-2.0`). You may use, copy,
-modify, and redistribute the software subject to its terms. You may not offer SubGen to third
-parties as a hosted or managed service that exposes a substantial set of its functionality, and
-you must preserve its license and copyright notices.
+modify and redistribute the software subject to its terms. You may not offer SubGen to third parties as
+a hosted or managed service that exposes a substantial set of its functionality, and you must preserve
+its license and copyright notices.
 
 ---
 
