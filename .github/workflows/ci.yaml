@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e '.[dev]'
+      - run: pip install ruff==0.14.5
       - run: ruff check .
       - run: docker compose config --quiet
         env:
