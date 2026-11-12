@@ -1,0 +1,26 @@
+name: NVIDIA smoke test
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: Container image to validate
+        required: true
+        default: ghcr.io/fahed-alhammadi/subgen:latest
+permissions:
+  contents: read
+  packages: read
+jobs:
+  gpu:
+    runs-on: [self-hosted, linux, x64, nvidia]
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: docker pull "${{ inputs.image }}"
+      - name: Validate CUDA and media runtime
+        run: |
+          docker run --rm --gpus all "${{ inputs.image }}" python3 -c \
+            "import torch; assert torch.cuda.is_available(); print(torch.cuda.get_device_name(0))"
+          docker run --rm "${{ inputs.image }}" ffmpeg -version

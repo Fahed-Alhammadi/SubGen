@@ -37,6 +37,10 @@ One unified container image supports CPU and NVIDIA GPU execution.
 - Built-in Hugging Face model downloads, selection, inventory, and deletion
 - Pluggable local translation through Hugging Face, Ollama, or LibreTranslate
 - Provider connection tests and persistent pipeline settings
+- Duration-based job progress, queue priorities, cancellation, retry, and regeneration
+- Built-in subtitle preview/editor with atomic saves
+- Searchable administrative audit history and integrated database backup/restore
+- CSRF protection, login throttling, session revocation, security headers, and optional TOTP
 - Environment-configured administrator account
 - Non-root UID/GID execution and reverse-proxy-friendly networking
 
@@ -50,7 +54,7 @@ HTTPS reverse proxy
 SubGen container
    |-- Web interface and API
    |-- Media scanner
-   |-- SQLite job queue
+       |-- Migrated SQLite job queue and audit log
    |-- faster-whisper transcription
    |-- Local NLLB translation
    `-- Subtitle writer
@@ -115,14 +119,14 @@ stored persistently below the configured `SUBGEN_MODEL_PATH`.
 Releases are published through GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/fahed-alhammadi/subgen:0.2.0
+docker pull ghcr.io/fahed-alhammadi/subgen:0.3.0
 ```
 
 The release workflow publishes these aliases:
 
 ```text
-ghcr.io/fahed-alhammadi/subgen:0.2.0
-ghcr.io/fahed-alhammadi/subgen:0.1
+ghcr.io/fahed-alhammadi/subgen:0.3.0
+ghcr.io/fahed-alhammadi/subgen:0.3
 ghcr.io/fahed-alhammadi/subgen:0
 ghcr.io/fahed-alhammadi/subgen:latest
 ```
@@ -211,14 +215,36 @@ Movie Name (2026).en.vtt
 Movie Name (2026).fr.ass
 ```
 
+## Queue and subtitle editor
+
+The Overview page reports transcription progress against media duration. Queued jobs are processed
+by priority and then creation time. Administrators can reprioritize, cancel, retry, or regenerate a
+job without entering the container.
+
+Completed jobs include an **Edit** action. The editor validates cue timing and text limits, then
+atomically replaces the sidecar so a failed write cannot leave a partial subtitle. Edits,
+regeneration, deletion, queue controls, settings changes, and authentication events appear under
+**Activity**.
+
+## Backup and restore
+
+Use **System → Backup and restore** to download a consistent SQLite snapshot. A validated restore
+is staged inside `/config` and restarts SubGen; the restored database is applied before workers
+start. Backups do not contain media or downloaded models, so protect those separately.
+
 ## Security
 
 - Replace all credentials before first launch.
+- Optionally set `SUBGEN_TOTP_SECRET` to a Base32 authenticator secret. When configured, login
+  requires a current six-digit TOTP code.
 - Keep `.env`, media, models, databases, and private tests outside Git.
 - Use HTTPS for remote access and keep the default localhost bind behind a local reverse proxy.
 - The container runs with the configured `PUID`/`PGID`, drops Linux capabilities, enables
   `no-new-privileges`, and never mounts the Docker socket.
 - Subtitle deletion is restricted to supported files inside configured libraries.
+- Mutating API requests require a session-bound CSRF token. Login attempts are rate limited and
+  logout revokes all outstanding sessions for the single administrator.
+- Forwarded client addresses are honored only from `SUBGEN_TRUSTED_PROXIES`.
 - Back up `/config/subgen.db` and generated subtitles.
 
 ## Configuration
@@ -238,6 +264,11 @@ See [.env.example](.env.example) for the full template.
 | `SUBGEN_WHISPER_COMPUTE_TYPE` | Whisper compute type; `auto` is recommended |
 | `SUBGEN_BIND_ADDRESS`, `SUBGEN_PORT` | Published web interface address and port |
 | `SUBGEN_SECURE_COOKIES` | Require HTTPS session cookies; keep enabled behind HTTPS |
+| `SUBGEN_SESSION_HOURS` | Maximum authenticated session lifetime |
+| `SUBGEN_LOGIN_ATTEMPTS` | Failed attempts allowed within the login window |
+| `SUBGEN_LOGIN_WINDOW_SECONDS` | Login throttling window |
+| `SUBGEN_TRUSTED_PROXIES` | Comma-separated proxy addresses allowed to supply client IPs |
+| `SUBGEN_TOTP_SECRET` | Optional Base32 secret for authenticator-based two-factor login |
 
 ## Updating
 
@@ -259,16 +290,17 @@ docker compose down
 Runtime directories are intentionally ignored by Git. Remove them only when you deliberately want
 to reset the local installation, and back up anything you need first.
 
-## Current limitations
+## Validation and operational boundaries
 
-Work remaining before a stable `1.0` release includes:
+Every release runs linting, Compose validation, Docker build checks, a published-image health smoke
+test, SBOM generation, and signed build-provenance attestation. A manual NVIDIA workflow is included
+for a self-hosted runner labeled `nvidia`; GPU owners can use it to validate CUDA visibility and the
+media runtime against any image tag.
 
-- CSRF protection, login throttling, trusted proxy enforcement, session revocation, and TOTP
-- Formal database migrations and integrated backup/restore
-- Subtitle preview/editor and expanded audit history interfaces
-- Duration-based progress, priorities, and cancellation
-- Wider language mappings and real-media integration validation
-- NVIDIA testing on a dedicated self-hosted runner
+SubGen now maps more than 60 common language codes for local NLLB translation. Ollama and
+LibreTranslate may support additional pairs depending on the selected model or server. As with any
+speech-recognition system, validate timing and translation quality on representative real media
+before enabling unattended processing across an irreplaceable library.
 
 ## License
 

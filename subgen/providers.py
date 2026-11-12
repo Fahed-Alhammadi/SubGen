@@ -3,11 +3,27 @@ from abc import ABC, abstractmethod
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from .config import get_settings
+
 NLLB_CODES = {
     "ar": "arb_Arab", "en": "eng_Latn", "es": "spa_Latn", "fr": "fra_Latn",
     "de": "deu_Latn", "it": "ita_Latn", "pt": "por_Latn", "ru": "rus_Cyrl",
     "tr": "tur_Latn", "zh": "zho_Hans", "ja": "jpn_Jpan", "ko": "kor_Hang",
     "hi": "hin_Deva", "fa": "pes_Arab", "ur": "urd_Arab", "nl": "nld_Latn",
+    "af": "afr_Latn", "am": "amh_Ethi", "az": "azj_Latn", "bg": "bul_Cyrl",
+    "bn": "ben_Beng", "bs": "bos_Latn", "ca": "cat_Latn", "cs": "ces_Latn",
+    "cy": "cym_Latn", "da": "dan_Latn", "el": "ell_Grek", "et": "est_Latn",
+    "fi": "fin_Latn", "ga": "gle_Latn", "gl": "glg_Latn", "gu": "guj_Gujr",
+    "he": "heb_Hebr", "hr": "hrv_Latn", "hu": "hun_Latn", "hy": "hye_Armn",
+    "id": "ind_Latn", "is": "isl_Latn", "ka": "kat_Geor", "kk": "kaz_Cyrl",
+    "km": "khm_Khmr", "kn": "kan_Knda", "lo": "lao_Laoo", "lt": "lit_Latn",
+    "lv": "lvs_Latn", "mk": "mkd_Cyrl", "ml": "mal_Mlym", "mn": "khk_Cyrl",
+    "mr": "mar_Deva", "ms": "zsm_Latn", "my": "mya_Mymr", "ne": "npi_Deva",
+    "no": "nob_Latn", "pa": "pan_Guru", "pl": "pol_Latn", "ro": "ron_Latn",
+    "sk": "slk_Latn", "sl": "slv_Latn", "sq": "als_Latn", "sr": "srp_Cyrl",
+    "sv": "swe_Latn", "sw": "swh_Latn", "ta": "tam_Taml", "te": "tel_Telu",
+    "th": "tha_Thai", "tl": "tgl_Latn", "uk": "ukr_Cyrl", "uz": "uzn_Latn",
+    "vi": "vie_Latn", "zh-hant": "zho_Hant",
 }
 
 
@@ -107,6 +123,9 @@ def test_provider(kind: str, values: dict[str, str]) -> dict[str, object]:
             response = request_json(f"{values['libretranslate_url'].rstrip('/')}/languages", timeout=10)
             return {"ok": True, "message": f"Connected · {len(response)} language(s)"}  # type: ignore[arg-type]
         if kind == "huggingface":
+            location = get_settings().model_dir / "translation" / values["translation_model"]
+            if not location.is_dir():
+                raise ValueError(f"Translation model is not installed: {values['translation_model']}")
             return {"ok": True, "message": "Local model provider is available"}
         raise ValueError("Unknown provider")
     except (HTTPError, URLError, TimeoutError, ValueError) as exc:

@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     media_root: Path = Path("/media")
     trusted_proxies: str = "127.0.0.1"
     secure_cookies: bool = True
+    session_hours: int = 24
+    login_attempts: int = 5
+    login_window_seconds: int = 300
+    totp_secret: SecretStr | None = None
     scan_interval_minutes: int = 30
     stable_file_seconds: int = 60
     worker_poll_seconds: int = 3
@@ -42,6 +46,10 @@ class Settings(BaseSettings):
     @property
     def database_url(self) -> str:
         return f"sqlite:///{self.config_dir / 'subgen.db'}"
+
+    @property
+    def backup_dir(self) -> Path:
+        return self.config_dir / "backups"
 
 
 @lru_cache

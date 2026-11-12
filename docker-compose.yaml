@@ -20,7 +20,7 @@ services:
       SUBGEN_CONFIG_DIR: /config
       SUBGEN_MODEL_DIR: /models
       SUBGEN_MEDIA_ROOT: /media
-      SUBGEN_WHISPER_DEVICE: auto
+      SUBGEN_WHISPER_DEVICE: ${SUBGEN_WHISPER_DEVICE:-auto}
       HOME: /config
       HF_HOME: /models/huggingface
       NVIDIA_VISIBLE_DEVICES: all

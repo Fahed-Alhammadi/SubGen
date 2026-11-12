@@ -13,6 +13,12 @@ from .providers import HuggingFaceTranslator, LibreTranslateTranslator, OllamaTr
 from .settings_store import all_values
 
 logger = logging.getLogger(__name__)
+
+
+class JobCancelled(Exception):
+    pass
+
+
 class Pipeline:
     def __init__(self, values: dict[str, str]) -> None:
         import torch
@@ -58,11 +64,35 @@ class Pipeline:
         segments, info = self.whisper.transcribe(
             str(media_path), beam_size=5, vad_filter=True, condition_on_previous_text=False
         )
-        materialized = list(segments)
+        duration_ms = max(1, int((info.duration or 0) * 1000))
+        materialized = []
+        for segment in segments:
+            materialized.append(segment)
+            processed_ms = int(segment.end * 1000)
+            with SessionLocal() as progress_db:
+                current = progress_db.get(Job, job.id)
+                if current is None or current.cancel_requested:
+                    raise JobCancelled("Cancelled by administrator")
+                current.duration_ms = duration_ms
+                current.processed_ms = processed_ms
+                current.progress = min(80, max(5, int(processed_ms / duration_ms * 80)))
+                progress_db.commit()
         source = (info.language or "en").split("-")[0]
+        with SessionLocal() as progress_db:
+            current = progress_db.get(Job, job.id)
+            if current is None or current.cancel_requested:
+                raise JobCancelled("Cancelled by administrator")
+            current.progress = 85
+            progress_db.commit()
         texts = self.translator.translate(
             [segment.text.strip() for segment in materialized], source, job.language
         )
+        with SessionLocal() as progress_db:
+            current = progress_db.get(Job, job.id)
+            if current is None or current.cancel_requested:
+                raise JobCancelled("Cancelled by administrator")
+            current.progress = 95
+            progress_db.commit()
         subtitles = pysubs2.SSAFile()
         for segment, text in zip(materialized, texts, strict=True):
             subtitles.append(
@@ -88,7 +118,8 @@ def worker_loop(stop: threading.Event) -> None:
     while not stop.is_set():
         with SessionLocal() as db:
             job = db.scalar(
-                select(Job).where(Job.status == JobStatus.QUEUED).order_by(Job.created_at).limit(1)
+                select(Job).where(Job.status == JobStatus.QUEUED)
+                .order_by(Job.priority.desc(), Job.created_at).limit(1)
             )
             if job is None:
                 stop.wait(get_settings().worker_poll_seconds)
@@ -103,6 +134,8 @@ def worker_loop(stop: threading.Event) -> None:
                 output = pipeline.run(job)
                 job.status, job.progress = JobStatus.COMPLETED, 100
                 job.output_path, job.finished_at = str(output), utcnow()
+            except JobCancelled as exc:
+                job.status, job.error, job.finished_at = JobStatus.CANCELLED, str(exc), utcnow()
             except Exception as exc:  # worker must survive individual corrupt media/model failures
                 logger.exception("Subtitle job %s failed", job.id)
                 job.status, job.error, job.finished_at = JobStatus.FAILED, str(exc)[:2000], utcnow()
