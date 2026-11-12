@@ -19,8 +19,8 @@ translates it locally when needed, and writes subtitle sidecars beside the sourc
 
 One unified container image supports CPU and NVIDIA GPU execution.
 
-> **Status:** Early MVP. Review the [current limitations](#current-limitations) before using SubGen
-> with irreplaceable media libraries.
+> **Status:** Active pre-1.0 development. Pin a versioned image, keep backups, and review the
+> [current limitations](#current-limitations) before using SubGen with irreplaceable libraries.
 
 ## Features
 
@@ -28,7 +28,7 @@ One unified container image supports CPU and NVIDIA GPU execution.
 - Unlimited media libraries and multiple target languages per library
 - SRT, ASS, and WebVTT output
 - Direct audio transcription using `faster-whisper`
-- Fully local NLLB translation with runtime network downloads disabled
+- Fully local Hugging Face translation with no implicit runtime downloads
 - One CPU/CUDA-capable image with automatic device selection
 - Local disk, NFS, and SMB/CIFS support
 - Sidecar names such as `Movie Name.ar.srt`
@@ -65,7 +65,7 @@ transcription source. Every configured language and format produces an external 
 
 - Linux with Docker Engine and Docker Compose v2
 - Write permission for every configured media library
-- Locally prepared Whisper and translation models
+- Enough persistent storage for the selected transcription and translation models
 - For GPU processing: an NVIDIA GPU, current driver, and NVIDIA Container Toolkit
 
 The published image currently targets `linux/amd64`.
@@ -88,13 +88,27 @@ SUBGEN_ADMIN_PASSWORD=replace-with-a-long-unique-password
 SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters
 ```
 
-Generate a signing key with `openssl rand -hex 32`, prepare the offline models, then start SubGen:
+Generate a signing key with `openssl rand -hex 32`, then start SubGen:
 
 ```bash
 docker compose up -d
 ```
 
-Open `http://127.0.0.1:8080` or route the service through an HTTPS reverse proxy.
+Open `http://127.0.0.1:8080`, sign in with the credentials from `.env`, and use **Model vault**
+to install the models you want. For remote access, route SubGen through an HTTPS reverse proxy.
+
+### First-run checklist
+
+1. Open **Models** and download a Whisper transcription model.
+2. Download a translation model if you intend to use the local Hugging Face provider.
+3. Open **Providers**, choose the transcription and translation models, configure the translation
+   provider, test it, and save the pipeline settings.
+4. Open **Libraries**, add each mounted container path with its target languages and output
+   formats, then select **Scan now**.
+5. Follow queued, active, completed, and failed jobs from **Overview**.
+
+Model downloads can be large. Keep the Models page open to monitor transfer status; models are
+stored persistently below the configured `SUBGEN_MODEL_PATH`.
 
 ## Container image
 
@@ -184,6 +198,10 @@ Configure and test providers from **Provider studio**:
 SubGen remains offline-first. Ollama and LibreTranslate default to Compose-network hostnames; no
 public translation service is enabled automatically.
 
+When Ollama or LibreTranslate runs in a separate container, attach both services to the same
+Docker network and use its service name in the provider URL. When it runs directly on the host,
+use a host address reachable from the SubGen container rather than `127.0.0.1`.
+
 ## Subtitle naming
 
 ```text
@@ -217,6 +235,9 @@ See [.env.example](.env.example) for the full template.
 | `SUBGEN_MODEL_PATH` | Offline model directory |
 | `SUBGEN_CONFIG_PATH` | Persistent configuration/database directory |
 | `SUBGEN_WHISPER_DEVICE` | `auto`, `cpu`, or `cuda` |
+| `SUBGEN_WHISPER_COMPUTE_TYPE` | Whisper compute type; `auto` is recommended |
+| `SUBGEN_BIND_ADDRESS`, `SUBGEN_PORT` | Published web interface address and port |
+| `SUBGEN_SECURE_COOKIES` | Require HTTPS session cookies; keep enabled behind HTTPS |
 
 ## Updating
 
@@ -228,6 +249,15 @@ docker compose up -d
 ```
 
 Use an explicit version instead of `latest` for reproducible deployments.
+
+To stop SubGen without deleting its database, settings, or downloaded models:
+
+```bash
+docker compose down
+```
+
+Runtime directories are intentionally ignored by Git. Remove them only when you deliberately want
+to reset the local installation, and back up anything you need first.
 
 ## Current limitations
 
