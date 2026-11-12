@@ -60,7 +60,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="SubGen", version="0.3.0", lifespan=lifespan, docs_url=None, redoc_url=None,
+    title="SubGen", version="0.3.1", lifespan=lifespan, docs_url=None, redoc_url=None,
     dependencies=[Depends(require_csrf)],
 )
 static_path = Path(__file__).parent / "static"

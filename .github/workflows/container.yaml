@@ -50,7 +50,7 @@ jobs:
             -e SUBGEN_ADMIN_PASSWORD=release-smoke-password \
             -e SUBGEN_SECRET_KEY=release-smoke-secret-key-at-least-32-characters \
             -e SUBGEN_SECURE_COOKIES=false \
-            ghcr.io/${{ github.repository }}@${{ steps.build.outputs.digest }}
+            ghcr.io/fahed-alhammadi/subgen@${{ steps.build.outputs.digest }}
           for attempt in {1..30}; do
             curl -fsS http://127.0.0.1:18080/health && exit 0
             sleep 2

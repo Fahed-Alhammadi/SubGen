@@ -119,13 +119,13 @@ stored persistently below the configured `SUBGEN_MODEL_PATH`.
 Releases are published through GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/fahed-alhammadi/subgen:0.3.0
+docker pull ghcr.io/fahed-alhammadi/subgen:0.3.1
 ```
 
 The release workflow publishes these aliases:
 
 ```text
-ghcr.io/fahed-alhammadi/subgen:0.3.0
+ghcr.io/fahed-alhammadi/subgen:0.3.1
 ghcr.io/fahed-alhammadi/subgen:0.3
 ghcr.io/fahed-alhammadi/subgen:0
 ghcr.io/fahed-alhammadi/subgen:latest

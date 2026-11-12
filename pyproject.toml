@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "subgen"
-version = "0.3.0"
+version = "0.3.1"
 description = "Offline-first subtitle generation for self-hosted media libraries"
 requires-python = ">=3.12"
 license = {text = "Elastic-2.0"}
