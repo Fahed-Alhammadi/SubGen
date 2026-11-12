@@ -1,150 +1,165 @@
+"""Background worker: claims queued jobs one at a time and runs the subtitle pipeline."""
+
+import json
 import logging
-import os
 import threading
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+from typing import Any
 
 from sqlalchemy import select
 
 from .config import get_settings
 from .db import Job, JobStatus, SessionLocal, utcnow
-from .paths import sidecar_path
-from .providers import HuggingFaceTranslator, LibreTranslateTranslator, OllamaTranslator, Translator
+from .media import library_root
+from .paths import confined_path, sidecar_path
+from .pipeline import (
+    Engine, JobCancelled, JobContext, Reporter, job_values, produce_cues, set_state, transcribe,
+    worker_state,
+)
+from .segmentation import Cue
 from .settings_store import all_values
+from .subtitles import write_subtitles
 
 logger = logging.getLogger(__name__)
+__all__ = ["recover_interrupted_jobs", "worker_loop", "worker_state", "JobCancelled"]
+RECOVERED = "Recovered after application restart"
 
 
-class JobCancelled(Exception):
-    pass
+def _options(job: Job) -> dict[str, Any]:
+    try:
+        return json.loads(job.options) if job.options else {}
+    except json.JSONDecodeError:
+        return {}
 
 
-class Pipeline:
-    def __init__(self, values: dict[str, str]) -> None:
-        import torch
-        from faster_whisper import WhisperModel
-
-        self.settings, self.values = get_settings(), values
-        requested = self.settings.whisper_device
-        self.device = "cuda" if requested == "auto" and torch.cuda.is_available() else requested
-        if self.device == "auto":
-            self.device = "cpu"
-        compute = self.settings.whisper_compute_type
-        if compute == "auto":
-            compute = "float16" if self.device == "cuda" else "int8"
-        logger.info("Inference device=%s compute_type=%s", self.device, compute)
-        whisper_location = self.settings.model_dir / "whisper" / values["transcription_model"]
-        whisper_ref = str(whisper_location) if whisper_location.exists() else values["transcription_model"]
-        self.whisper = WhisperModel(
-            whisper_ref,
-            device=self.device,
-            compute_type=compute,
-            download_root=str(self.settings.model_dir / "whisper"),
-            local_files_only=True,
+def claim_next() -> JobContext | None:
+    with SessionLocal() as db:
+        job = db.scalar(
+            select(Job).where(Job.status == JobStatus.QUEUED)
+            .order_by(Job.priority.desc(), Job.created_at, Job.id).limit(1)
         )
-        self.translator = self._build_translator()
-
-    def _build_translator(self) -> Translator:
-        provider = self.values["translation_provider"]
-        if provider == "ollama":
-            return OllamaTranslator(self.values["ollama_url"], self.values["ollama_model"])
-        if provider == "libretranslate":
-            return LibreTranslateTranslator(
-                self.values["libretranslate_url"], self.values["libretranslate_api_key"]
-            )
-        location = self.settings.model_dir / "translation" / self.values["translation_model"]
-        if not location.exists():
-            raise FileNotFoundError(f"Local translation model is not installed: {self.values['translation_model']}")
-        return HuggingFaceTranslator(str(location), self.device)
-
-    def run(self, job: Job) -> Path:
-        import pysubs2
-
-        media_path = Path(job.media.path)
-        segments, info = self.whisper.transcribe(
-            str(media_path), beam_size=5, vad_filter=True, condition_on_previous_text=False
-        )
-        duration_ms = max(1, int((info.duration or 0) * 1000))
-        materialized = []
-        for segment in segments:
-            materialized.append(segment)
-            processed_ms = int(segment.end * 1000)
-            with SessionLocal() as progress_db:
-                current = progress_db.get(Job, job.id)
-                if current is None or current.cancel_requested:
-                    raise JobCancelled("Cancelled by administrator")
-                current.duration_ms = duration_ms
-                current.processed_ms = processed_ms
-                current.progress = min(80, max(5, int(processed_ms / duration_ms * 80)))
-                progress_db.commit()
-        source = (info.language or "en").split("-")[0]
-        with SessionLocal() as progress_db:
-            current = progress_db.get(Job, job.id)
-            if current is None or current.cancel_requested:
-                raise JobCancelled("Cancelled by administrator")
-            current.progress = 85
-            progress_db.commit()
-        texts = self.translator.translate(
-            [segment.text.strip() for segment in materialized], source, job.language
-        )
-        with SessionLocal() as progress_db:
-            current = progress_db.get(Job, job.id)
-            if current is None or current.cancel_requested:
-                raise JobCancelled("Cancelled by administrator")
-            current.progress = 95
-            progress_db.commit()
-        subtitles = pysubs2.SSAFile()
-        for segment, text in zip(materialized, texts, strict=True):
-            subtitles.append(
-                pysubs2.SSAEvent(start=int(segment.start * 1000), end=int(segment.end * 1000), text=text)
-            )
-        output = sidecar_path(media_path, job.language, job.output_format)
-        # Atomic replacement prevents partially written subtitles after interruption.
-        with NamedTemporaryFile(
-            mode="w", suffix=f".{job.output_format}", dir=output.parent, delete=False, encoding="utf-8"
-        ) as temporary:
-            temporary_path = Path(temporary.name)
+        if job is None:
+            return None
+        job.status, job.stage, job.progress = JobStatus.PROCESSING, "loading", 1
+        job.started_at, job.finished_at = utcnow(), None
+        job.cancel_requested, job.processed_ms, job.transcribe_started_at = False, 0, None
+        media = job.media
         try:
-            subtitles.save(str(temporary_path), format_=job.output_format, encoding="utf-8")
-            os.replace(temporary_path, output)
-        finally:
-            temporary_path.unlink(missing_ok=True)
-        return output
+            root = library_root(media.library)
+            path = confined_path(Path(media.path), root)
+        except ValueError as exc:
+            job.status, job.error, job.finished_at = JobStatus.FAILED, f"Refusing to process: {exc}", utcnow()
+            db.commit()
+            return None
+        context = JobContext(
+            job.id, media.id, path, media.size, media.mtime_ns, job.language, job.output_format,
+            _options(job), root,
+        )
+        db.commit()
+        return context
+
+
+def _finish(job_id: int, status: JobStatus, *, output: Path | None = None, error: str | None = None) -> None:
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return
+        job.status, job.finished_at = status, utcnow()
+        job.stage = "done" if status == JobStatus.COMPLETED else job.stage
+        if status == JobStatus.COMPLETED:
+            job.progress, job.output_path, job.error = 100, str(output), None
+        else:
+            job.error = (error or "")[:4000]
+        db.commit()
+
+
+def _output_path(ctx: JobContext, output_format: str) -> Path:
+    """Sidecar path, re-confined right before writing in case folders were swapped for symlinks."""
+    output = sidecar_path(ctx.media_path, ctx.language, output_format)
+    if ctx.root is not None:
+        confined_path(output.parent, ctx.root)
+    return output
+
+
+def _complete_siblings(
+    ctx: JobContext, cues: list[Cue], values: dict[str, Any], detected: str | None, duration_ms: int
+) -> None:
+    """Write other queued formats for the same media and language from the cues just produced."""
+    with SessionLocal() as db:
+        siblings = db.scalars(select(Job).where(
+            Job.media_id == ctx.media_id, Job.language == ctx.language, Job.status == JobStatus.QUEUED,
+            Job.output_format != ctx.output_format,
+        )).all()
+        for job in siblings:
+            if _options(job) != ctx.options:
+                continue
+            try:
+                output = _output_path(ctx, job.output_format)
+                write_subtitles(cues, output, job.output_format, values)
+            except (OSError, ValueError):
+                logger.exception("Could not write sibling subtitle %s", output)
+                continue
+            now = utcnow()
+            job.status, job.stage, job.progress = JobStatus.COMPLETED, "done", 100
+            job.started_at, job.finished_at, job.output_path = now, now, str(output)
+            job.detected_language, job.error = detected, None
+            job.duration_ms, job.processed_ms, job.stage = duration_ms, duration_ms, "done"
+        db.commit()
+
+
+def run_job(ctx: JobContext, engine: Engine) -> None:
+    reporter = Reporter(ctx.job_id)
+    set_state(state="processing", job_id=ctx.job_id, message="")
+    try:
+        with SessionLocal() as db:
+            values = job_values(all_values(db), ctx.options)
+        transcript = transcribe(ctx, values, reporter, engine)
+        cues = produce_cues(ctx, values, transcript, reporter, engine)
+        if not cues:
+            raise ValueError("No speech was recognised in this file")
+        reporter.update(stage="writing", progress=97, force=True)
+        output = _output_path(ctx, ctx.output_format)
+        write_subtitles(cues, output, ctx.output_format, values)
+        _finish(ctx.job_id, JobStatus.COMPLETED, output=output)
+        _complete_siblings(ctx, cues, values, transcript.language, transcript.duration_ms)
+        set_state(state="idle", job_id=None)
+    except JobCancelled as exc:
+        _finish(ctx.job_id, JobStatus.CANCELLED, error=str(exc))
+        set_state(state="idle", job_id=None)
+    except Exception as exc:  # the worker must survive corrupt media and model failures
+        logger.exception("Subtitle job %s failed", ctx.job_id)
+        _finish(ctx.job_id, JobStatus.FAILED, error=str(exc) or type(exc).__name__)
+        set_state(state="error", job_id=None, message=str(exc)[:500])
 
 
 def worker_loop(stop: threading.Event) -> None:
-    pipeline: Pipeline | None = None
-    signature: tuple[tuple[str, str], ...] | None = None
+    engine = Engine()
+    set_state(device=engine.device, compute_type=engine.compute)
     while not stop.is_set():
-        with SessionLocal() as db:
-            job = db.scalar(
-                select(Job).where(Job.status == JobStatus.QUEUED)
-                .order_by(Job.priority.desc(), Job.created_at).limit(1)
-            )
-            if job is None:
-                stop.wait(get_settings().worker_poll_seconds)
-                continue
-            job.status, job.started_at, job.progress = JobStatus.PROCESSING, utcnow(), 5
-            db.commit()
-            try:
-                values = all_values(db)
-                current_signature = tuple(sorted(values.items()))
-                if pipeline is None or current_signature != signature:
-                    pipeline, signature = Pipeline(values), current_signature
-                output = pipeline.run(job)
-                job.status, job.progress = JobStatus.COMPLETED, 100
-                job.output_path, job.finished_at = str(output), utcnow()
-            except JobCancelled as exc:
-                job.status, job.error, job.finished_at = JobStatus.CANCELLED, str(exc), utcnow()
-            except Exception as exc:  # worker must survive individual corrupt media/model failures
-                logger.exception("Subtitle job %s failed", job.id)
-                job.status, job.error, job.finished_at = JobStatus.FAILED, str(exc)[:2000], utcnow()
-            db.commit()
+        try:
+            context = claim_next()
+        except Exception:
+            logger.exception("Could not read the job queue")
+            stop.wait(get_settings().worker_poll_seconds)
+            continue
+        if context is None:
+            if worker_state["state"] == "processing":
+                set_state(state="idle", job_id=None)
+            stop.wait(get_settings().worker_poll_seconds)
+            continue
+        run_job(context, engine)
 
 
 def recover_interrupted_jobs() -> None:
     with SessionLocal() as db:
         for job in db.scalars(select(Job).where(Job.status == JobStatus.PROCESSING)):
-            job.status, job.error = JobStatus.QUEUED, "Recovered after application restart"
+            job.finished_at = utcnow()
+            if job.cancel_requested:
+                job.status, job.error = JobStatus.CANCELLED, "Cancelled by administrator"
+            elif job.error == RECOVERED:
+                # Interrupted twice: probably this file crashes the worker (e.g. out of memory).
+                job.status, job.error = JobStatus.FAILED, "SubGen stopped twice while processing this file"
+            else:
+                job.status, job.stage, job.error, job.finished_at = JobStatus.QUEUED, "queued", RECOVERED, None
+                job.progress = 0
         db.commit()
-

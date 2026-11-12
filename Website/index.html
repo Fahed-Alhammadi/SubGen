@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SubGen: self-hosted, offline subtitle generator for media libraries</title>
+  <meta name="description" content="SubGen scans your media libraries, transcribes audio with faster-whisper on CPU or NVIDIA GPU, translates with local models, and writes SRT, ASS and WebVTT sidecars beside every file. Self-hosted and offline-first.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f1f5ee" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#06100d" media="(prefers-color-scheme: dark)">
+  <link rel="canonical" href="https://fahed-alhammadi.github.io/SubGen/">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SubGen">
+  <meta property="og:title" content="SubGen: subtitles for your whole library, made on your own server">
+  <meta property="og:description" content="Offline-first subtitle generation for self-hosted media libraries. Local Whisper transcription, local translation, SRT, ASS and WebVTT sidecars.">
+  <meta property="og:url" content="https://fahed-alhammadi.github.io/SubGen/">
+  <meta property="og:image" content="https://fahed-alhammadi.github.io/SubGen/assets/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="SubGen logo with a subtitled film frame">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="SubGen: subtitles for your whole library, made on your own server">
+  <meta name="twitter:description" content="Offline-first subtitle generation for self-hosted media libraries. Local Whisper transcription, local translation, SRT, ASS and WebVTT sidecars.">
+  <meta name="twitter:image" content="https://fahed-alhammadi.github.io/SubGen/assets/og-image.png">
+
+  <link rel="stylesheet" href="assets/site.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="./" aria-label="SubGen home">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="bm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c6f85e"/><stop offset="1" stop-color="#70df87"/></linearGradient></defs><rect width="32" height="32" rx="9" fill="url(#bm)"/><path d="M21.6 10.1c-1.5-1.8-3.6-2.6-5.9-2.6-3.2 0-5.6 1.7-5.6 4.3 0 2.7 2.4 3.6 5.6 4.3 3.4.7 6 1.9 6 4.9 0 2.8-2.5 4.7-6.1 4.7-2.7 0-5.1-1-6.6-3" fill="none" stroke="#0a190f" stroke-width="3.4" stroke-linecap="round"/></svg>
+        <span>SubGen</span>
+      </a>
+      <nav class="site-nav" aria-label="Main">
+        <ul>
+          <li class="nav-optional"><a href="#features">Features</a></li>
+          <li class="nav-optional"><a href="#pipeline">How it works</a></li>
+          <li class="nav-optional"><a href="#screenshots">Screenshots</a></li>
+          <li class="nav-optional"><a href="#faq">FAQ</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen">GitHub</a></li>
+          <li class="nav-cta"><a href="#install">Install</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 id="hero-title">Subtitles for your whole library, made on your own server.</h1>
+          <p class="lede">SubGen scans your media folders, transcribes the audio with Whisper, translates it with local models, and writes SRT, ASS or WebVTT files right beside each video. Your media stays on your hardware.</p>
+          <div class="actions">
+            <a class="button button-primary" href="#install">Install with Docker</a>
+            <a class="button" href="https://github.com/Fahed-Alhammadi/SubGen">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              View source on GitHub
+            </a>
+          </div>
+          <p class="hero-note">New in 0.4: a subtitle-quality engine, drag-and-drop Studio, and a built-in editor. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
+        </div>
+
+        <figure class="player" id="player" aria-labelledby="player-caption">
+          <figcaption id="player-caption" class="visually-hidden">An example cue from the film Low Tide, shown in the language you pick, with the sidecar file SubGen writes for it.</figcaption>
+          <div class="frame">
+            <div class="frame-silhouette" aria-hidden="true">
+              <svg viewBox="0 0 1600 558" preserveAspectRatio="xMidYMax slice">
+                <path fill="currentColor" d="M0 175V128c80-10 140-24 210-18 50 4 90 16 150 22 70 6 120 28 180 43z"/>
+                <rect x="286" y="84" width="14" height="38" fill="currentColor"/>
+                <path fill="currentColor" d="M282 86h22l-11-12z"/>
+                <circle cx="293" cy="90" r="5" fill="#ffe6b3"/>
+                <path fill="currentColor" d="M0 558V470c200-30 380-15 560-22 200-8 340 22 540 14 200-7 350-32 500-22v118z"/>
+                <path fill="currentColor" opacity=".85" d="M1040 448l6-58h4l4 58zm60 4l5-44h4l4 44zm56 2l4-34h4l3 34z"/>
+              </svg>
+            </div>
+            <div class="frame-meta" aria-hidden="true"><span>Low Tide (2024).mkv</span><span>00:42:18</span></div>
+            <p class="cue" id="cue" lang="en" dir="ltr"><span>We should leave before</span><span>the tide comes in.</span></p>
+          </div>
+
+          <div class="timeline" aria-hidden="true">
+            <div class="timeline-cues">
+              <span style="left:4%;width:25%">127</span>
+              <span class="is-active" style="left:35%;width:28%">128</span>
+              <span style="left:69%;width:23%">129</span>
+            </div>
+            <svg class="timeline-wave" viewBox="0 0 1200 56" preserveAspectRatio="none"><path fill="currentColor" d="M1 26.9h5.5v2.1h-5.5zM9 27.0h5.5v2.0h-5.5zM17 26.6h5.5v2.7h-5.5zM25 27.0h5.5v2.0h-5.5zM33 26.7h5.5v2.5h-5.5zM41 26.9h5.5v2.2h-5.5zM49 18.5h5.5v19.0h-5.5zM57 12.7h5.5v30.6h-5.5zM65 17.5h5.5v21.0h-5.5zM73 11.9h5.5v32.3h-5.5zM81 16.0h5.5v24.0h-5.5zM89 15.3h5.5v25.5h-5.5zM97 10.1h5.5v35.9h-5.5zM105 3.7h5.5v48.6h-5.5zM113 13.9h5.5v28.3h-5.5zM121 12.2h5.5v31.5h-5.5zM129 6.1h5.5v43.8h-5.5zM137 1.4h5.5v53.3h-5.5zM145 7.2h5.5v41.6h-5.5zM153 10.2h5.5v35.5h-5.5zM161 2.4h5.5v51.1h-5.5zM169 16.1h5.5v23.8h-5.5zM177 5.8h5.5v44.4h-5.5zM185 14.0h5.5v28.0h-5.5zM193 16.4h5.5v23.1h-5.5zM201 17.4h5.5v21.2h-5.5zM209 16.0h5.5v24.0h-5.5zM217 11.7h5.5v32.5h-5.5zM225 18.7h5.5v18.5h-5.5zM233 16.0h5.5v24.0h-5.5zM241 16.4h5.5v23.2h-5.5zM249 19.3h5.5v17.5h-5.5zM257 18.7h5.5v18.6h-5.5zM265 22.5h5.5v11.1h-5.5zM273 22.9h5.5v10.3h-5.5zM281 22.4h5.5v11.2h-5.5zM289 20.3h5.5v15.3h-5.5zM297 22.0h5.5v12.0h-5.5zM305 22.8h5.5v10.4h-5.5zM313 21.9h5.5v12.3h-5.5zM321 22.7h5.5v10.7h-5.5zM329 23.5h5.5v9.0h-5.5zM337 21.7h5.5v12.5h-5.5zM345 22.0h5.5v12.0h-5.5zM353 27.0h5.5v2.0h-5.5zM361 26.7h5.5v2.6h-5.5zM369 26.8h5.5v2.5h-5.5zM377 26.4h5.5v3.1h-5.5zM385 26.6h5.5v2.9h-5.5zM393 27.0h5.5v2.0h-5.5zM401 26.3h5.5v3.3h-5.5zM409 27.0h5.5v2.0h-5.5zM417 26.9h5.5v2.3h-5.5zM761 26.9h5.5v2.3h-5.5zM769 26.9h5.5v2.2h-5.5zM777 26.4h5.5v3.1h-5.5zM785 26.4h5.5v3.3h-5.5zM793 27.0h5.5v2.0h-5.5zM801 27.0h5.5v2.0h-5.5zM809 27.0h5.5v2.0h-5.5zM817 27.0h5.5v2.0h-5.5zM825 26.8h5.5v2.4h-5.5zM833 18.6h5.5v18.8h-5.5zM841 20.3h5.5v15.4h-5.5zM849 21.7h5.5v12.6h-5.5zM857 17.9h5.5v20.3h-5.5zM865 17.6h5.5v20.8h-5.5zM873 15.0h5.5v26.0h-5.5zM881 10.3h5.5v35.5h-5.5zM889 12.0h5.5v32.1h-5.5zM897 13.0h5.5v30.0h-5.5zM905 11.0h5.5v34.0h-5.5zM913 9.5h5.5v37.0h-5.5zM921 16.8h5.5v22.4h-5.5zM929 5.2h5.5v45.6h-5.5zM937 6.2h5.5v43.6h-5.5zM945 4.5h5.5v47.0h-5.5zM953 5.3h5.5v45.5h-5.5zM961 10.9h5.5v34.2h-5.5zM969 10.8h5.5v34.3h-5.5zM977 15.1h5.5v25.7h-5.5zM985 8.1h5.5v39.9h-5.5zM993 16.2h5.5v23.6h-5.5zM1001 16.5h5.5v23.0h-5.5zM1009 15.2h5.5v25.6h-5.5zM1017 16.4h5.5v23.3h-5.5zM1025 15.0h5.5v26.0h-5.5zM1033 18.8h5.5v18.3h-5.5zM1041 20.0h5.5v16.0h-5.5zM1049 19.2h5.5v17.5h-5.5zM1057 20.4h5.5v15.2h-5.5zM1065 19.1h5.5v17.8h-5.5zM1073 22.3h5.5v11.5h-5.5zM1081 17.7h5.5v20.7h-5.5zM1089 20.2h5.5v15.6h-5.5zM1097 23.3h5.5v9.4h-5.5zM1105 23.4h5.5v9.2h-5.5zM1113 26.9h5.5v2.2h-5.5zM1121 26.9h5.5v2.2h-5.5zM1129 27.0h5.5v2.0h-5.5zM1137 26.5h5.5v3.1h-5.5zM1145 26.3h5.5v3.3h-5.5zM1153 26.8h5.5v2.4h-5.5zM1161 26.8h5.5v2.4h-5.5zM1169 27.0h5.5v2.0h-5.5zM1177 27.0h5.5v2.0h-5.5zM1185 26.9h5.5v2.1h-5.5zM1193 27.0h5.5v2.0h-5.5z"/><path class="wave-active" fill="currentColor" d="M425 16.2h5.5v23.6h-5.5zM433 20.1h5.5v15.8h-5.5zM441 16.5h5.5v23.0h-5.5zM449 19.9h5.5v16.3h-5.5zM457 12.9h5.5v30.3h-5.5zM465 10.7h5.5v34.5h-5.5zM473 11.9h5.5v32.3h-5.5zM481 7.2h5.5v41.6h-5.5zM489 13.4h5.5v29.2h-5.5zM497 7.6h5.5v40.9h-5.5zM505 8.2h5.5v39.6h-5.5zM513 7.8h5.5v40.4h-5.5zM521 9.1h5.5v37.8h-5.5zM529 3.0h5.5v50.0h-5.5zM537 1.1h5.5v53.7h-5.5zM545 8.2h5.5v39.5h-5.5zM553 5.4h5.5v45.2h-5.5zM561 14.8h5.5v26.5h-5.5zM569 5.5h5.5v45.0h-5.5zM577 6.8h5.5v42.3h-5.5zM585 2.6h5.5v50.7h-5.5zM593 5.9h5.5v44.2h-5.5zM601 13.8h5.5v28.4h-5.5zM609 13.3h5.5v29.4h-5.5zM617 10.9h5.5v34.2h-5.5zM625 18.9h5.5v18.1h-5.5zM633 15.2h5.5v25.7h-5.5zM641 18.8h5.5v18.3h-5.5zM649 20.0h5.5v16.0h-5.5zM657 21.1h5.5v13.8h-5.5zM665 16.6h5.5v22.8h-5.5zM673 21.8h5.5v12.4h-5.5zM681 21.6h5.5v12.7h-5.5zM689 21.4h5.5v13.2h-5.5zM697 19.5h5.5v16.9h-5.5zM705 23.9h5.5v8.3h-5.5zM713 22.6h5.5v10.8h-5.5zM721 22.5h5.5v10.9h-5.5zM729 21.3h5.5v13.4h-5.5zM737 21.2h5.5v13.5h-5.5zM745 20.8h5.5v14.4h-5.5zM753 23.2h5.5v9.7h-5.5z"/></svg>
+            <div class="playhead"></div>
+          </div>
+
+          <div class="player-bar">
+            <p class="srt" aria-live="off" id="srt"><code class="srt-file" id="srt-file">Low Tide (2024).en.srt</code><span class="srt-body" id="srt-body">128
+00:42:17,480 --&gt; 00:42:20,120
+<b>We should leave before
+the tide comes in.</b></span></p>
+            <div class="lang-switch" role="group" aria-label="Subtitle language">
+              <button type="button" data-lang="en" aria-pressed="true">English</button>
+              <button type="button" data-lang="ar" aria-pressed="false" lang="ar">العربية</button>
+              <button type="button" data-lang="fr" aria-pressed="false" lang="fr">Français</button>
+              <button type="button" data-lang="es" aria-pressed="false" lang="es">Español</button>
+              <button type="button" data-lang="ja" aria-pressed="false" lang="ja">日本語</button>
+              <button type="button" class="icon-button" id="cycle-toggle" aria-label="Pause language cycling" hidden>
+                <svg viewBox="0 0 14 14" aria-hidden="true" class="i-pause"><path fill="currentColor" d="M3 2h3v10H3zm5 0h3v10H8z"/></svg>
+                <svg viewBox="0 0 14 14" aria-hidden="true" class="i-play" hidden><path fill="currentColor" d="M3 1.5v11l9-5.5z"/></svg>
+              </button>
+            </div>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="features-title">Everything between the audio track and a finished subtitle file</h2>
+          <p>SubGen 0.4 rebuilds the pipeline around subtitle quality: cues that read well, no wasted transcription, and proper tools for fixing the last few lines by hand.</p>
+        </div>
+
+        <article class="feature" aria-labelledby="f-local">
+          <div class="feature-copy">
+            <h3 id="f-local">Runs entirely on your hardware</h3>
+            <p>Transcription and translation happen inside one container, on CPU or an NVIDIA GPU. Nothing is sent to a cloud service, and nothing is billed per minute.</p>
+            <ul class="ticks">
+              <li><strong>faster-whisper</strong> transcribes from the media audio, picking CUDA automatically when a GPU is present.</li>
+              <li><strong>Local translation</strong> with Hugging Face models stored on your disk, or your own Ollama or LibreTranslate server.</li>
+              <li><strong>No surprise downloads.</strong> Models download only when you click install. If a model is missing, the job fails visibly instead of reaching out.</li>
+            </ul>
+          </div>
+          <div class="artifact">
+            <div class="artifact-title"><span>Your pipeline</span><code>/models</code></div>
+            <dl class="stack">
+              <div>
+                <dt>Transcription</dt>
+                <dd>faster-whisper, CPU or NVIDIA CUDA from the same image
+                  <span class="pill-row"><span class="pill">tiny to large-v3</span><span class="pill">auto device</span></span></dd>
+              </div>
+              <div>
+                <dt>Translation, built in</dt>
+                <dd>Hugging Face models on local storage
+                  <span class="pill-row"><span class="pill">NLLB-200</span><span class="pill">M2M100</span><span class="pill">Marian / OPUS-MT</span></span></dd>
+              </div>
+              <div>
+                <dt>Translation, your server</dt>
+                <dd>Point SubGen at a service you already run
+                  <span class="pill-row"><span class="pill">Ollama</span><span class="pill">LibreTranslate</span></span></dd>
+              </div>
+              <div>
+                <dt>Internet needed</dt>
+                <dd>Only while you download a model. Generation works fully offline.</dd>
+              </div>
+            </dl>
+          </div>
+        </article>
+
+        <article class="feature" aria-labelledby="f-quality">
+          <div class="feature-copy">
+            <h3 id="f-quality">Cues people can actually read</h3>
+            <p>Raw speech recognition output arrives in long, uneven chunks. The subtitle-quality engine rebuilds it from word timestamps into cues that follow the rules you set.</p>
+            <ul class="ticks">
+              <li><strong>Re-segmentation</strong> by characters per line, lines per cue, minimum and maximum duration, and the gap between cues.</li>
+              <li><strong>Line balancing</strong> splits two-line cues at natural points so neither line is a stub.</li>
+              <li><strong>Hallucination filtering</strong> drops the repeated phrases Whisper sometimes invents over silence and music.</li>
+            </ul>
+          </div>
+          <div class="artifact">
+            <div class="artifact-title"><span>Same speech, before and after</span></div>
+            <div class="cue-compare">
+              <div class="cue-block">
+                <h4>Whisper segment</h4>
+                <div class="one"><span class="tc">00:03:02,100 --&gt; 00:03:11,940</span><span class="txt">So I told him we couldn't make it back before dark, and he just laughed and said the road would be fine. <del>Thank you. Thank you. Thank you.</del></span></div>
+                <span class="cue-note">Repeated phrase over silence removed</span>
+              </div>
+              <div class="cue-block">
+                <h4>SubGen cues</h4>
+                <div class="one"><span class="tc">00:03:02,100 --&gt; 00:03:05,060</span><span class="txt">So I told him we couldn't
+make it back before dark,</span></div>
+                <div class="one"><span class="tc">00:03:05,300 --&gt; 00:03:08,420</span><span class="txt">and he just laughed and said
+the road would be fine.</span></div>
+              </div>
+            </div>
+            <div class="rules" aria-label="Example segmentation rules">
+              <span class="pill">42 characters per line</span><span class="pill">2 lines</span><span class="pill">1 to 7 seconds</span><span class="pill">Gap between cues</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature" aria-labelledby="f-cache">
+          <div class="feature-copy">
+            <h3 id="f-cache">Transcribe once, translate many</h3>
+            <p>Transcription is the slow part, so SubGen does it once per file. The transcript is cached and reused for every target language and format, including ones you add months later.</p>
+            <ul class="ticks">
+              <li><strong>One pass of Whisper</strong> feeds Arabic, French, Spanish and any other target language.</li>
+              <li><strong>SRT, ASS and WebVTT</strong> from the same cues, written atomically so players never see half a file.</li>
+              <li><strong>Sidecars your player finds</strong>, named like <code>Movie (2024).ar.srt</code> next to the video.</li>
+            </ul>
+          </div>
+          <div class="artifact">
+            <div class="artifact-title"><span>One file, many sidecars</span><code>/media/movies</code></div>
+            <div class="fanout">
+              <div>
+                <div class="fan-node"><b>Low Tide (2024).mkv</b><small>Audio track 2, English</small></div>
+                <div class="fan-node is-cache"><b>Transcript</b><small>Cached after the first run</small></div>
+              </div>
+              <div class="fan-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h15m-5-5 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <ul class="files">
+                <li><span>Low Tide (2024).en.srt</span><span>Written</span></li>
+                <li><span>Low Tide (2024).ar.srt</span><span>Written</span></li>
+                <li><span>Low Tide (2024).fr.vtt</span><span>Written</span></li>
+                <li><span>Low Tide (2024).es.ass</span><span>Written</span></li>
+                <li class="is-later"><span>Low Tide (2024).de.srt</span><span>Added later, no re-transcription</span></li>
+              </ul>
+            </div>
+          </div>
+        </article>
+
+        <article class="feature" aria-labelledby="f-scan">
+          <div class="feature-copy">
+            <h3 id="f-scan">Scans that know what is already there</h3>
+            <p>Point SubGen at a library and it works out which files actually need subtitles, so a first scan of a large collection does not bury the queue.</p>
+            <ul class="ticks">
+              <li><strong>Skips covered files</strong> that already have a matching external subtitle, including variants like <code>Movie.eng.srt</code>, or an embedded subtitle track.</li>
+              <li><strong>Ignore patterns</strong> keep samples, trailers and extras out of the queue.</li>
+              <li><strong>Prunes deleted media</strong> from the inventory and picks the audio track that matches the language you expect.</li>
+              <li><strong>Waits for copies to finish</strong> before touching files that are still being written.</li>
+            </ul>
+          </div>
+          <div class="artifact">
+            <div class="artifact-title"><span>Scan results, target language English</span><code>/media/movies</code></div>
+            <ul class="scan">
+              <li><span class="file">Low Tide (2024).mkv<small>Uses audio track 2 (English)</small></span><span class="verdict v-queue">Queued</span></li>
+              <li><span class="file">Northern Line (2021).mkv<small>Northern Line (2021).eng.srt is beside it</small></span><span class="verdict v-skip">Already has subtitles</span></li>
+              <li><span class="file">Paper Moon Hotel (2018).mkv<small>Embedded English subtitle track</small></span><span class="verdict v-skip">Already has subtitles</span></li>
+              <li><span class="file">extras/teaser-sample.mkv<small>Matches the pattern *sample*</small></span><span class="verdict v-ignore">Ignored</span></li>
+              <li class="is-gone"><span class="file">Old Cut (2009).mkv<small>No longer on disk</small></span><span class="verdict v-prune">Pruned</span></li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="feature" aria-labelledby="f-studio">
+          <div class="feature-copy">
+            <h3 id="f-studio">Studio and a real subtitle editor</h3>
+            <p>Not everything lives in a library. Drop a single file into Studio and download its subtitles when the job finishes. Then fix the lines that matter in the editor.</p>
+            <ul class="ticks">
+              <li><strong>Studio</strong> takes video or audio by drag and drop. Uploads expire on their own after the retention window you choose.</li>
+              <li><strong>Edit against the picture</strong> with a video preview, timing shift, split and merge, and find and replace.</li>
+              <li><strong>Readability warnings</strong> flag cues that are too long or too fast to read before you save.</li>
+            </ul>
+          </div>
+          <div class="artifact">
+            <div class="artifact-title"><span>Editor</span><code>Low Tide (2024).en.srt</code></div>
+            <div class="editor-rows">
+              <div class="editor-row"><span class="n">212</span><span><span class="tc">01:12:04,200 --&gt; 01:12:06,900</span><span class="txt">You kept the lighthouse key?</span></span></div>
+              <div class="editor-row is-warn"><span class="n">213</span><span><span class="tc">01:12:07,000 --&gt; 01:12:07,900</span><span class="txt">I couldn't. Not tonight, not after
+everything that happened out there.</span></span><span class="warn">Reading speed 77 characters per second</span></div>
+              <div class="editor-row"><span class="n">214</span><span><span class="tc">01:12:08,300 --&gt; 01:12:10,100</span><span class="txt">Then we go without it.</span></span></div>
+            </div>
+            <div class="editor-tools" aria-label="Editor tools">
+              <span>Shift timing</span><span>Split</span><span>Merge</span><span>Find and replace</span><span>Save</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Operations and security -->
+    <section class="section" id="operations" aria-labelledby="ops-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="ops-title">Built to be left running</h2>
+          <p>SubGen is meant to sit on a NAS or home server and get on with it. The admin tools are there for the times you need them, and the defaults are locked down.</p>
+        </div>
+        <div class="ops">
+          <div>
+            <h3>Day to day</h3>
+            <p>Manage models, the queue and settings from the browser, without opening a shell.</p>
+            <dl>
+              <div><dt>Model vault</dt><dd>Install recommended Whisper and translation models in one click and watch the download progress.</dd></div>
+              <div><dt>Queue</dt><dd>Priorities, cancel, retry and regenerate, bulk actions across many jobs, plus live speed and time remaining.</dd></div>
+              <div><dt>Settings</dt><dd>Grouped, validated options for transcription, segmentation, translation, scanning, output and the Studio workspace, each with a reset to default.</dd></div>
+              <div><dt>Activity and backups</dt><dd>A searchable audit log of edits, deletions, settings changes and sign-ins, with one-click database backup and validated restore.</dd></div>
+            </dl>
+          </div>
+          <div>
+            <h3>Security</h3>
+            <p>One administrator, configured from the environment, and a container that asks for as little as possible.</p>
+            <dl>
+              <div><dt>Sign-in</dt><dd>Login throttling, optional TOTP two-factor codes, and sign-out that revokes every session.</dd></div>
+              <div><dt>Request protection</dt><dd>Session-bound CSRF tokens on every change and a strict Content Security Policy in the web interface.</dd></div>
+              <div><dt>Non-root container</dt><dd>Runs as your <code>PUID</code>/<code>PGID</code> with all Linux capabilities dropped, <code>no-new-privileges</code>, and no Docker socket.</dd></div>
+              <div><dt>Contained file access</dt><dd>Writes and deletions are limited to subtitle files inside configured libraries.</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pipeline -->
+    <section class="section" id="pipeline" aria-labelledby="pipeline-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="pipeline-title">How a job runs</h2>
+          <p>Every subtitle goes through the same stages, and the queue shows which stage each job is in.</p>
+        </div>
+        <ol class="pipeline">
+          <li><div><h3>Find</h3><p>A library scan or a Studio upload adds the file to the queue.</p></div></li>
+          <li><div><h3>Probe</h3><p>ffprobe reads the duration and tracks, and SubGen picks the right audio track.</p></div></li>
+          <li><div><h3>Extract</h3><p>The chosen audio track is decoded for speech recognition.</p></div></li>
+          <li><div><h3>Transcribe</h3><p>faster-whisper with word timestamps, or a cached transcript when one exists.</p></div></li>
+          <li><div><h3>Shape</h3><p>The quality engine builds balanced, readable cues and drops hallucinations.</p></div></li>
+          <li><div><h3>Translate</h3><p>Each target language, with a local model or your own provider.</p></div></li>
+          <li><div><h3>Write</h3><p>An atomic write of SRT, ASS or WebVTT beside the media.</p></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Screenshots -->
+    <section class="section" id="screenshots" aria-labelledby="shots-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="shots-title">A look around</h2>
+          <p>The web interface covers the whole job, from installing models to editing a single cue.</p>
+        </div>
+        <div class="gallery">
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/dashboard.png">
+              <img src="assets/screenshots/dashboard.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen overview page with worker status, the active job's progress, queued jobs and counts for the last 24 hours.">
+              <span class="shot-fallback" aria-hidden="true"><b>Overview</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Overview.</b> Worker status, the running job and the last 24 hours at a glance.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/studio.png">
+              <img src="assets/screenshots/studio.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen Studio with a drop zone for a media file, language and format choices, and finished subtitles ready to download.">
+              <span class="shot-fallback" aria-hidden="true"><b>Studio</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Studio.</b> Drop a file, choose languages and formats, download the subtitles.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/editor.png">
+              <img src="assets/screenshots/editor.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen subtitle editor with a video preview, a list of timed cues and readability warnings on cues that are too fast.">
+              <span class="shot-fallback" aria-hidden="true"><b>Editor</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Editor.</b> Edit cues against the video with timing tools and readability warnings.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/library.png">
+              <img src="assets/screenshots/library.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen libraries page listing media folders with their target languages, output formats and scan results.">
+              <span class="shot-fallback" aria-hidden="true"><b>Libraries</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Libraries.</b> Target languages, formats and subtitle coverage for each folder.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/queue.png">
+              <img src="assets/screenshots/queue.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen job queue with priorities, job stages, progress, speed and estimated time remaining, and bulk action controls.">
+              <span class="shot-fallback" aria-hidden="true"><b>Queue</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Queue.</b> Priorities, bulk actions, and live speed and time remaining.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/models.png">
+              <img src="assets/screenshots/models.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen model vault with recommended Whisper and translation models, installed models and a download in progress.">
+              <span class="shot-fallback" aria-hidden="true"><b>Model vault</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Model vault.</b> One-click recommended models with download progress.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/settings.png">
+              <img src="assets/screenshots/settings.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen settings page with tabs for transcription, segmentation, translation, scanning, output and workspace options.">
+              <span class="shot-fallback" aria-hidden="true"><b>Settings</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Settings.</b> Validated options grouped by pipeline stage.</figcaption>
+          </figure>
+          <figure class="shot">
+            <a class="shot-frame" href="assets/screenshots/login.png">
+              <img src="assets/screenshots/login.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen sign-in page with username, password and an optional two-factor code field.">
+              <span class="shot-fallback" aria-hidden="true"><b>Sign in</b>Screenshot coming soon</span>
+            </a>
+            <figcaption><b>Sign in.</b> A single administrator account with optional two-factor codes.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick start -->
+    <section class="section" id="install" aria-labelledby="install-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="install-title">Quick start</h2>
+          <p>You need Linux with Docker Engine and Compose v2. The image targets <code>linux/amd64</code>. For GPU transcription, add an NVIDIA GPU, a current driver and the NVIDIA Container Toolkit.</p>
+        </div>
+        <ol class="steps">
+          <li>
+            <h3>Clone and prepare folders</h3>
+            <p>Configuration, models and media live in folders you control.</p>
+            <div class="code">
+              <div class="code-head"><span>shell</span><button type="button" class="copy" hidden>Copy</button></div>
+              <pre><code>git clone https://github.com/Fahed-Alhammadi/SubGen.git
+cd SubGen
+cp .env.example .env
+mkdir -p data/config data/models media
+chown -R 1000:1000 data media</code></pre>
+            </div>
+          </li>
+          <li>
+            <h3>Set your credentials</h3>
+            <p>Replace the placeholders in <code>.env</code>. Generate a signing key with <code>openssl rand -hex 32</code>.</p>
+            <div class="code">
+              <div class="code-head"><span>.env</span><button type="button" class="copy" hidden>Copy</button></div>
+              <pre><code>SUBGEN_ADMIN_USERNAME=admin
+SUBGEN_ADMIN_PASSWORD=replace-with-a-long-unique-password
+SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
+            </div>
+          </li>
+          <li>
+            <h3>Start SubGen</h3>
+            <p>The compose file grants NVIDIA GPU access. On a CPU-only host, comment out <code>gpus: all</code> first and the same image uses the CPU.</p>
+            <div class="code">
+              <div class="code-head"><span>shell</span><button type="button" class="copy" hidden>Copy</button></div>
+              <pre><code>docker compose up -d</code></pre>
+            </div>
+          </li>
+          <li>
+            <h3>Install a model and add a library</h3>
+            <p>Open <code>http://127.0.0.1:8080</code> and sign in. In the Model vault, install a recommended Whisper model, plus a translation model if you want local translation. Then add each mounted folder under Libraries, choose its languages and formats, and select Scan now.</p>
+          </li>
+        </ol>
+
+        <div class="callout">
+          <p><strong>Updating.</strong> Back up <code>/config</code>, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version with <code>SUBGEN_IMAGE=ghcr.io/fahed-alhammadi/subgen:0.4</code> in <code>.env</code>.</p>
+          <p><strong>Remote access.</strong> Keep the default localhost bind and put SubGen behind an HTTPS reverse proxy. Mount extra libraries as separate paths below <code>/media</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section" id="faq" aria-labelledby="faq-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="faq-title">Questions</h2>
+        </div>
+        <div class="faq">
+          <details>
+            <summary>Does SubGen send my media or audio anywhere?</summary>
+            <div class="answer">
+              <p>No. Transcription and the built-in translation provider run inside the container using models on your disk. The only outbound traffic is a model download you start yourself. If you configure Ollama or LibreTranslate, subtitle text goes to the address you enter, which is usually another container on the same machine.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Do I need an NVIDIA GPU?</summary>
+            <div class="answer">
+              <p>No. The same image runs on CPU and on NVIDIA GPUs. With the device set to <code>auto</code>, SubGen uses CUDA when it is available. A GPU is much faster for large libraries; smaller Whisper models are practical on CPU.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Which languages are supported?</summary>
+            <div class="answer">
+              <p>Whisper transcribes dozens of spoken languages. For local translation, SubGen maps more than 60 common language codes to NLLB, and M2M100 and Marian models cover further pairs. Ollama and LibreTranslate support whatever your chosen model or server supports. Always check timing and translation quality on your own media before enabling unattended processing.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Does it reuse subtitles that already exist?</summary>
+            <div class="answer">
+              <p>Existing external and embedded subtitles are used to decide that a file does not need work, so scans skip it. They are never used as a transcription source: SubGen always generates from the audio.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Where are subtitles saved, and will Plex, Jellyfin or Emby find them?</summary>
+            <div class="answer">
+              <p>Subtitles are written beside the media with the language code in the name, for example <code>Movie (2024).ar.srt</code>, <code>Movie (2024).en.vtt</code> or <code>Movie (2024).fr.ass</code>. This is the sidecar naming that common media servers look for. Library folders must be writable by the container user.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Can I run it on a NAS with network shares?</summary>
+            <div class="answer">
+              <p>Yes, on any Linux host that runs Docker with an <code>amd64</code> CPU. Local disks, NFS and SMB/CIFS mounts all work. Mount each library at its own path below <code>/media</code> and keep share credentials out of Git.</p>
+            </div>
+          </details>
+          <details>
+            <summary>What does the license allow?</summary>
+            <div class="answer">
+              <p>SubGen is source-available under the <a href="https://github.com/Fahed-Alhammadi/SubGen/blob/main/LICENSE">Elastic License 2.0</a>. You can use, modify and redistribute it, including running it for yourself or your organisation. You cannot offer it to third parties as a hosted or managed service, and you must keep the license and copyright notices.</p>
+            </div>
+          </details>
+          <details>
+            <summary>Is it ready for my irreplaceable library?</summary>
+            <div class="answer">
+              <p>SubGen is in active pre-1.0 development. Pin a versioned image, back up <code>/config</code>, and try it on a copy or a small library first. Subtitle writes are atomic and deletions are limited to subtitle files, but backups are still your safety net.</p>
+            </div>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- Resources -->
+    <section class="section" aria-labelledby="res-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="res-title">Source and documentation</h2>
+        </div>
+        <nav class="resources" aria-labelledby="res-title">
+          <a href="https://github.com/Fahed-Alhammadi/SubGen"><b>GitHub repository</b><span>Source code, issues and releases.</span></a>
+          <a href="https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen"><b>Container image</b><span><code>ghcr.io/fahed-alhammadi/subgen</code></span></a>
+          <a href="https://github.com/Fahed-Alhammadi/SubGen#readme"><b>Documentation</b><span>Configuration, libraries, providers and backups.</span></a>
+          <a href="https://github.com/Fahed-Alhammadi/SubGen/blob/main/docs/API.md"><b>HTTP API reference</b><span>Endpoints used by the web interface.</span></a>
+        </nav>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div class="footer-row">
+        <a class="brand" href="./" aria-label="SubGen home">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#bbf451"/><path d="M21.6 10.1c-1.5-1.8-3.6-2.6-5.9-2.6-3.2 0-5.6 1.7-5.6 4.3 0 2.7 2.4 3.6 5.6 4.3 3.4.7 6 1.9 6 4.9 0 2.8-2.5 4.7-6.1 4.7-2.7 0-5.1-1-6.6-3" fill="none" stroke="#0a190f" stroke-width="3.4" stroke-linecap="round"/></svg>
+          <span>SubGen</span>
+        </a>
+        <ul class="footer-links">
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen">GitHub</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen">Container image</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen#readme">Documentation</a></li>
+          <li><a href="https://github.com/Fahed-Alhammadi/SubGen/blob/main/LICENSE">License</a></li>
+          <li><a href="privacy.html">Privacy</a></li>
+        </ul>
+      </div>
+      <p class="legal">© 2026 Fahed Alhammadi. SubGen is licensed under the Elastic License 2.0.</p>
+    </div>
+  </footer>
+</body>
+</html>

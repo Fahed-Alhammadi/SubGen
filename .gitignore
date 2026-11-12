@@ -1,12 +1,23 @@
+# Private / secrets
+CLAUDE.md
+Keys/
 .env
+
+# Python
 .venv/
-.vscode/
-.validation/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
-tests/
+
+# Editors and local validation
+.vscode/
+.validation/
+.DS_Store
+
+# Runtime data (never commit media, models or databases)
 data/
 media/
 
+# Private tests (owner's choice)
+tests/
