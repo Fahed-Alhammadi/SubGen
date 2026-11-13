@@ -245,7 +245,7 @@ function paintStorage(el, s) {
         </div>
         <div class="storage-row">
           <div><strong>Studio workspace</strong><p class="small muted num">${plural(ws.count || 0, 'upload')}, ${bytes(ws.bytes || 0)}</p></div>
-          <a class="btn btn-sm" href="#/studio">Open Studio</a>
+          <a class="btn btn-sm" href="/studio">Open Studio</a>
         </div>
       </div>
     </div>`,

@@ -18,9 +18,10 @@ export async function mount(ctx) {
     root,
     html`${pageHeader({
       title: 'Models',
-      subtitle: 'Speech recognition and translation models stored on this server. Jobs only use installed models and never download on their own.',
+      subtitle: 'Speech recognition and translation models stored on this server. The models in use are installed automatically when they are missing; jobs never download anything themselves.',
     })}
     <div class="stack models">
+      <div data-slot="missing"></div>
       <section class="panel" aria-labelledby="dl-h" data-slot="downloads-panel" hidden>
         <div class="panel-head"><h2 id="dl-h">Downloads</h2></div>
         <ul class="download-list" data-slot="downloads"></ul>
@@ -52,6 +53,7 @@ export async function mount(ctx) {
   );
 
   const slots = {
+    missing: $('[data-slot=missing]', root),
     downloadsPanel: $('[data-slot=downloads-panel]', root),
     downloads: $('[data-slot=downloads]', root),
     recommended: $('[data-slot=recommended]', root),
@@ -85,10 +87,33 @@ export async function mount(ctx) {
   const downloadingSet = () => new Set((data ? data.downloads : []).filter((d) => ACTIVE.has(d.status)).map((d) => `${d.kind}:${d.repo_id}`));
 
   function paint() {
+    paintMissing();
     paintDownloads();
     paintRecommended();
     paintInstalled();
     if (results) paintResults();
+  }
+
+  /** Selected models that are not on disk yet (normally because they are being installed). */
+  function paintMissing() {
+    const dl = downloadingSet();
+    const missing = (data.selected || []).filter((m) => !m.installed);
+    render(
+      slots.missing,
+      html`${missing.map((m) => {
+        const downloading = dl.has(`${m.kind}:${m.repo_id}`);
+        return html`<div class="callout missing-model" data-tone="${downloading ? 'info' : 'danger'}" role="status">
+          ${icon(downloading ? 'loader' : 'alert', { cls: downloading ? 'spin' : '' })}
+          <div>
+            <strong>${KIND_LABEL[m.kind] || m.kind} model in use: <code class="break">${m.repo_id}</code></strong>
+            <span class="small">${downloading
+              ? 'It is being installed now. Jobs wait until it is ready.'
+              : 'It is not installed yet, so jobs that need it will fail. Install it now, or choose another installed model.'}</span>
+            ${downloading ? '' : html`<div>${modelButtons(m.kind, m.repo_id, false, false, false)}</div>`}
+          </div>
+        </div>`;
+      })}`,
+    );
   }
 
   function paintDownloads() {
@@ -250,6 +275,32 @@ export async function mount(ctx) {
     });
   });
 
+  async function deleteModel(kind, repo) {
+    const [owner, ...rest] = repo.split('/');
+    const path = [kind, owner, rest.join('/')].map(encodeURIComponent).join('/');
+    try {
+      await api.del(`/api/models/${path}`);
+      notify.ok(`Deleted ${repo}.`);
+      poller.trigger();
+    } catch (err) {
+      notify.error(err);
+    }
+  }
+
+  /** After switching models, the one it replaced is no longer used: delete it or keep it. */
+  async function offerDelete(kind, previous) {
+    const size = (data && data.installed.find((m) => m.kind === kind && m.repo_id === previous)) || {};
+    const ok = await confirmDialog({
+      title: 'Delete the previous model?',
+      message: `${previous} is no longer in use.${size.size ? ` Deleting it frees ${bytes(size.size)}.` : ''}`,
+      detail: 'Keep it to switch back quickly later. You can also delete it from the Installed list at any time.',
+      confirmLabel: 'Delete model',
+      cancelLabel: 'Keep it',
+      danger: true,
+    });
+    if (ok) await deleteModel(kind, previous);
+  }
+
   const poller = createPoller(load, () => (data && data.downloads.some((d) => ACTIVE.has(d.status)) ? 2000 : null));
 
   const off = delegate(root, 'click', {
@@ -264,16 +315,20 @@ export async function mount(ctx) {
           notify.error(err);
         }
       }),
-    select: (el) =>
-      busy(el, async () => {
+    select: async (el) => {
+      const { kind, repo } = el.dataset;
+      let res;
+      await busy(el, async () => {
         try {
-          await api.post('/api/models/select', { kind: el.dataset.kind, repo_id: el.dataset.repo });
-          notify.ok(`${el.dataset.repo} is now the ${KIND_LABEL[el.dataset.kind].toLowerCase()} model.`);
+          res = await api.post('/api/models/select', { kind, repo_id: repo });
+          notify.ok(`${repo} is now the ${KIND_LABEL[kind].toLowerCase()} model.`);
           poller.trigger();
         } catch (err) {
           notify.error(err);
         }
-      }),
+      });
+      if (res && res.previous) await offerDelete(kind, res.previous);
+    },
     delete: async (el) => {
       const { kind, repo } = el.dataset;
       const ok = await confirmDialog({
@@ -283,16 +338,7 @@ export async function mount(ctx) {
         confirmLabel: 'Delete model',
         danger: true,
       });
-      if (!ok) return;
-      const [owner, ...rest] = repo.split('/');
-      const path = [kind, owner, rest.join('/')].map(encodeURIComponent).join('/');
-      try {
-        await api.del(`/api/models/${path}`);
-        notify.ok(`Deleted ${repo}.`);
-        poller.trigger();
-      } catch (err) {
-        notify.error(err);
-      }
+      if (ok) await deleteModel(kind, repo);
     },
     dismiss: async (el) => {
       try {

@@ -1,4 +1,4 @@
-// SubGen web UI bootstrap: shell wiring, theme, worker status and hash router.
+// SubGen web UI bootstrap: shell wiring, theme, worker status and path router (History API).
 import { api } from './api.js';
 import { html, render, $, $$ } from './ui/dom.js';
 import { icon } from './ui/icons.js';
@@ -33,14 +33,20 @@ const NAV_ICONS = {
 };
 
 const page = document.getElementById('page');
-let current = null; // {cleanup, guard, hash}
-let currentHash = null;
+let current = null; // {cleanup, guard, onQuery}
+let currentUrl = null; // path + search of the mounted view
 let routeToken = 0;
 
-function parseHash() {
-  const rawHash = window.location.hash.replace(/^#/, '') || '/';
-  const [path, query = ''] = rawHash.split('?');
-  return { path: path.startsWith('/') ? path : `/${path}`, query: new URLSearchParams(query), raw: rawHash };
+function parseLocation() {
+  const path = window.location.pathname || '/';
+  const search = window.location.search || '';
+  return { path, query: new URLSearchParams(search), raw: `${path}${search}` };
+}
+
+/** Old bookmarks used '/queue' URLs; move them to the real path. */
+function upgradeHashUrl() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#/')) history.replaceState(null, '', hash.slice(1));
 }
 
 function matchRoute(path) {
@@ -77,21 +83,41 @@ async function guardAllows() {
   });
 }
 
-async function onHashChange() {
-  const next = parseHash();
-  const prevPath = currentHash ? currentHash.split('?')[0] : null;
+async function goTo(next, { push }) {
+  const prevPath = currentUrl ? currentUrl.split('?')[0] : null;
   // Query-only changes inside the same view are handled by the view itself.
   if (current && prevPath === next.path && current.onQuery) {
-    currentHash = next.raw;
+    if (push) history.pushState(null, '', next.raw);
+    currentUrl = next.raw;
     current.onQuery(next.query);
     return;
   }
   if (!(await guardAllows())) {
-    // Restore the previous URL without triggering another navigation.
-    history.replaceState(null, '', `#${currentHash}`);
+    // Back/forward already changed the address bar: put the current view's URL back.
+    if (!push) history.pushState(null, '', currentUrl);
     return;
   }
+  if (push) history.pushState(null, '', next.raw);
   await mount(next, { focus: true });
+}
+
+function onPopState() {
+  goTo(parseLocation(), { push: false });
+}
+
+/** Handle clicks on same-origin app links without a page load. */
+function onLinkClick(event) {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target.closest('a[href]');
+  if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+  const href = link.getAttribute('href');
+  if (!href || href.startsWith('#') || !href.startsWith('/') || href.startsWith('//')) return;
+  const url = new URL(link.href);
+  if (url.origin !== window.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/static/') || url.pathname === '/login') return;
+  event.preventDefault();
+  const raw = `${url.pathname}${url.search}`;
+  if (raw === currentUrl) return;
+  goTo({ path: url.pathname, query: new URLSearchParams(url.search), raw }, { push: true });
 }
 
 async function mount(location, { focus = false } = {}) {
@@ -105,7 +131,7 @@ async function mount(location, { focus = false } = {}) {
     }
   }
   current = null;
-  currentHash = location.raw;
+  currentUrl = location.raw;
 
   const found = matchRoute(location.path);
   if (!found) {
@@ -117,7 +143,7 @@ async function mount(location, { focus = false } = {}) {
         <span class="empty-icon">${icon('alert')}</span>
         <h1>Page not found</h1>
         <p>There is nothing at this address.</p>
-        <a class="btn btn-primary" href="#/">Go to overview</a>
+        <a class="btn btn-primary" href="/">Go to overview</a>
       </div>`,
     );
     document.title = 'Not found – SubGen';
@@ -158,12 +184,12 @@ async function mount(location, { focus = false } = {}) {
       });
       const s = search.toString();
       const nextRaw = `${location.path}${s ? `?${s}` : ''}`;
-      currentHash = nextRaw;
-      history.replaceState(null, '', `#${nextRaw}`);
+      currentUrl = nextRaw;
+      history.replaceState(null, '', nextRaw);
     },
     isCurrent: () => token === routeToken,
     /** Re-mount the current view (used by "Try again" buttons). */
-    reload: () => mount(parseHash()),
+    reload: () => mount(parseLocation()),
   };
   current = { cleanup: null, guard: null, onQuery: null };
   try {
@@ -182,10 +208,11 @@ async function mount(location, { focus = false } = {}) {
 }
 
 /** Navigate programmatically (respects the leave guard). */
-export function navigate(hash) {
-  const target = hash.startsWith('#') ? hash : `#${hash}`;
-  if (window.location.hash === target) return;
-  window.location.hash = target;
+export function navigate(path) {
+  const url = new URL(path.replace(/^#/, ''), window.location.origin);
+  const raw = `${url.pathname}${url.search}`;
+  if (raw === currentUrl) return;
+  goTo({ path: url.pathname, query: new URLSearchParams(url.search), raw }, { push: true });
 }
 
 /* ---------------- Theme ---------------- */
@@ -303,7 +330,7 @@ function boot() {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintThemeButtons);
   $$('[data-theme-toggle]').forEach((btn) => btn.addEventListener('click', toggleTheme));
   $$('[data-logout]').forEach((btn) => btn.addEventListener('click', () => logout(btn)));
-  // The skip link must not change the hash: the router would treat '#page' as a route.
+  // Move focus without adding '#page' to the address bar.
   $$('.skip-link').forEach((link) => link.addEventListener('click', (event) => {
     event.preventDefault();
     const target = $('#page');
@@ -317,13 +344,15 @@ function boot() {
       event.returnValue = '';
     }
   });
-  window.addEventListener('hashchange', onHashChange);
+  window.addEventListener('popstate', onPopState);
+  document.addEventListener('click', onLinkClick);
 
   onWorker(paintWorker);
   paintWorker(workerState);
   shellPoller.start();
   loadSession();
-  mount(parseHash());
+  upgradeHashUrl();
+  mount(parseLocation());
 }
 
 boot();

@@ -31,7 +31,7 @@ export async function mount(ctx) {
   const root = ctx.root;
   const jobId = Number(ctx.params.jobId);
   ctx.setTitle('Subtitle editor');
-  render(root, html`${pageHeader({ title: 'Subtitle editor', crumb: { href: '#/queue', label: 'Queue' } })}${skeletonRows(8)}`);
+  render(root, html`${pageHeader({ title: 'Subtitle editor', crumb: { href: '/queue', label: 'Queue' } })}${skeletonRows(8)}`);
 
   let doc;
   try {
@@ -40,7 +40,7 @@ export async function mount(ctx) {
     if (err.status === 401) return undefined;
     render(
       root,
-      html`${pageHeader({ title: 'Subtitle editor', crumb: { href: '#/queue', label: 'Queue' } })}
+      html`${pageHeader({ title: 'Subtitle editor', crumb: { href: '/queue', label: 'Queue' } })}
       <div class="panel">${errorState(err)}</div>`,
     );
     root.querySelector('[data-action=retry-load]').addEventListener('click', () => ctx.reload());
@@ -74,7 +74,7 @@ function createEditor(ctx, doc, jobId) {
     html`
       ${pageHeader({
         title: doc.name,
-        crumb: { href: '#/queue', label: 'Queue' },
+        crumb: { href: '/queue', label: 'Queue' },
         subtitle: html`${String(doc.language || '').toUpperCase()} ${String(doc.format || '').toUpperCase()} subtitle, <span data-cue-count class="num"></span> <span class="dirty-flag" data-dirty hidden>${icon('edit')}Unsaved changes</span>`,
         actions: html`
           <a class="btn" href="${downloadUrl(jobId)}" download>${icon('download')}Download</a>
@@ -229,7 +229,7 @@ function createEditor(ctx, doc, jobId) {
         <span class="cue-dur small muted num" data-role="dur">${((c.end_ms - c.start_ms) / 1000).toFixed(2)} s</span>
       </div>
       <div class="cue-body">
-        <textarea class="textarea cue-text" data-role="text" rows="${textRows(c.text)}" aria-label="Text of cue ${i + 1}" maxlength="${MAX_TEXT}">${escapeHtml(c.text)}</textarea>
+        <textarea class="textarea cue-text" data-role="text" dir="auto" rows="${textRows(c.text)}" aria-label="Text of cue ${i + 1}" maxlength="${MAX_TEXT}">${escapeHtml(c.text)}</textarea>
         <div class="cue-warn" data-role="warn">${warningsMarkup(warnings)}</div>
       </div>
       <div class="cue-actions">

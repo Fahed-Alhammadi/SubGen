@@ -11,7 +11,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from .config import get_settings
 from .security import is_authenticated
 
-PUBLIC_API = {"/api/login"}
+PUBLIC_API = {"/api/login", "/api/login/totp"}
 MIB = 1024 * 1024
 
 
@@ -22,7 +22,7 @@ def body_limit(method: str, path: str) -> int:
         return 2048 * MIB
     if method == "PUT" and path.startswith("/api/subtitles/"):
         return 64 * MIB
-    if path == "/api/login":
+    if path in PUBLIC_API:
         return 64 * 1024
     return MIB
 

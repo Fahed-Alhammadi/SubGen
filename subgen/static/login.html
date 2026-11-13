@@ -27,29 +27,28 @@
       <span>SubGen</span>
     </div>
 
-    <div class="login-reel" aria-hidden="true">
-      <div class="login-cue"><span class="tc">00:00:01,200</span><span>Subtitles for your whole library,</span></div>
-      <div class="login-cue"><span class="tc">00:00:03,850</span><span>generated on your own hardware.</span></div>
-      <div class="login-track"><span></span></div>
-    </div>
-
     <form class="login-card" id="login-form" method="post" action="/api/login" novalidate>
-      <h1>Sign in</h1>
-      <div class="field">
-        <label for="username">Username</label>
-        <input class="input" id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+      <h1 id="login-title">Sign in</h1>
+      <div data-step="password">
+        <div class="field">
+          <label for="username">Username</label>
+          <input class="input" id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
+        </div>
       </div>
-      <div class="field">
-        <label for="password">Password</label>
-        <input class="input" id="password" name="password" type="password" autocomplete="current-password" required>
-      </div>
-      <div class="field">
-        <label for="totp_code">Authenticator code <span class="muted">(if enabled)</span></label>
-        <input class="input num" id="totp_code" name="totp_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="123456" aria-describedby="totp-help">
-        <span class="field-help" id="totp-help">Only needed when two-factor sign-in is configured on the server.</span>
+      <div data-step="totp" hidden>
+        <p class="small muted">Two-factor sign-in is on. Enter the six-digit code from your authenticator app.</p>
+        <div class="field">
+          <label for="totp_code">Authenticator code</label>
+          <input class="input num" id="totp_code" name="totp_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="123456">
+        </div>
       </div>
       <p class="login-error" id="login-error" role="alert" hidden></p>
       <button type="submit" class="btn btn-primary login-submit">Sign in</button>
+      <button type="button" class="btn btn-ghost login-back" data-back hidden>Use a different account</button>
     </form>
 
     <p class="login-foot small muted">Self-hosted and offline. Your media never leaves this server.</p>

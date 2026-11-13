@@ -16,6 +16,7 @@ const GROUP_LABEL = {
   scanning: 'Scanning',
   output: 'Output',
   workspace: 'Workspace',
+  security: 'Security',
 };
 const GROUP_INTRO = {
   transcription: 'How Whisper turns speech into text.',
@@ -24,6 +25,7 @@ const GROUP_INTRO = {
   scanning: 'When and how libraries are checked for new media.',
   output: 'How subtitle files are written next to your media.',
   workspace: 'Studio uploads and temporary files.',
+  security: 'Sign-in protection for the administrator account.',
 };
 const PROVIDERS = [
   ['huggingface', 'Hugging Face', 'Local translation model on this server'],
@@ -57,7 +59,7 @@ export async function mount(ctx) {
   const original = { ...(payload.values || {}) };
   const fieldByKey = new Map(schema.map((f) => [f.key, f]));
   const cleared = new Set(); // secret keys the user asked to clear
-  const groups = [...GROUP_ORDER.filter((g) => schema.some((f) => f.group === g)), ...[...new Set(schema.map((f) => f.group))].filter((g) => !GROUP_ORDER.includes(g))];
+  const groups = [...GROUP_ORDER.filter((g) => schema.some((f) => f.group === g)), ...[...new Set(schema.map((f) => f.group))].filter((g) => !GROUP_ORDER.includes(g)), 'security'];
   let activeGroup = groups.includes(ctx.query.get('tab')) ? ctx.query.get('tab') : groups[0];
 
   render(
@@ -73,9 +75,11 @@ export async function mount(ctx) {
         (g) => html`<section class="panel settings-panel" role="tabpanel" id="panel-${g}" aria-labelledby="tab-${g}" data-panel="${g}" ${g === activeGroup ? '' : 'hidden'}>
           <div class="panel-head"><div><h2>${GROUP_LABEL[g] || g}</h2><p class="small muted">${GROUP_INTRO[g] || ''}</p></div></div>
           ${g === 'translation' ? providerTests() : ''}
-          <div class="settings-fields">
-            ${schema.filter((f) => f.group === g).map((f) => fieldRow(f, original[f.key], languages, models))}
-          </div>
+          ${g === 'security'
+            ? html`<div class="security" data-security>${skeletonRows(2)}</div>`
+            : html`<div class="settings-fields">
+              ${schema.filter((f) => f.group === g).map((f) => fieldRow(f, original[f.key], languages, models))}
+            </div>`}
         </section>`,
       )}
       <div class="savebar" data-savebar hidden>
@@ -355,7 +359,158 @@ export async function mount(ctx) {
 
   ctx.setGuard(() => (refresh() ? 'You have unsaved settings. They will be lost if you leave.' : ''));
   refresh();
+  mountSecurity($('[data-security]', root));
   return undefined;
+}
+
+/* ---------- Security: two-factor sign-in (TOTP) ---------- */
+
+function groupSecret(secret) {
+  return secret.replace(/(.{4})/g, '$1 ').trim();
+}
+
+function mountSecurity(box) {
+  let state = null; // {enabled, managed_by_env}
+  let setup = null; // {secret, uri} while enabling
+
+  async function load() {
+    try {
+      state = await api.get('/api/totp');
+      paint();
+    } catch (err) {
+      if (err.status !== 401) render(box, errorState(err, { compact: true }));
+    }
+  }
+
+  function paint() {
+    if (state.managed_by_env) {
+      render(box, html`<div class="security-row">
+        <div><h3>Two-factor sign-in</h3><p class="small muted">After your password, sign-in asks for a six-digit code from an authenticator app.</p></div>
+        <span class="badge" data-tone="ok">${icon('check')}On</span>
+      </div>
+      <div class="callout" data-tone="info" role="note">${icon('info')}<div>It is configured on the server with <code>SUBGEN_TOTP_SECRET</code>. Remove that variable and restart SubGen to manage it here.</div></div>`);
+      return;
+    }
+    if (state.enabled) {
+      render(box, html`<div class="security-row">
+        <div><h3>Two-factor sign-in</h3><p class="small muted">After your password, sign-in asks for a six-digit code from your authenticator app.</p></div>
+        <span class="badge" data-tone="ok">${icon('check')}On</span>
+      </div>
+      <div class="security-form">
+        <div class="field">
+          <label for="totp-off-code">Current code</label>
+          <input class="input num" id="totp-off-code" data-code inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" aria-describedby="totp-off-help">
+          <span class="field-help" id="totp-off-help">Enter a code from your authenticator app to turn two-factor sign-in off.</span>
+        </div>
+        <button type="button" class="btn btn-danger" data-totp="disable">Turn off</button>
+      </div>`);
+      return;
+    }
+    if (!setup) {
+      render(box, html`<div class="security-row">
+        <div><h3>Two-factor sign-in</h3><p class="small muted">Ask for a six-digit code from an authenticator app (such as Google Authenticator, Microsoft Authenticator, 1Password or Bitwarden) after the password.</p></div>
+        <span class="badge">Off</span>
+      </div>
+      <div><button type="button" class="btn btn-primary" data-totp="setup">${icon('check')}Set up two-factor sign-in</button></div>`);
+      return;
+    }
+    render(box, html`<div class="security-row">
+        <div><h3>Set up two-factor sign-in</h3><p class="small muted">Nothing changes until you confirm a code.</p></div>
+        <span class="badge">Off</span>
+      </div>
+      <ol class="security-steps">
+        <li>
+          <p>In your authenticator app, add an account and enter this setup key (time-based, 6 digits):</p>
+          <div class="security-secret">
+            <code class="mono break" data-secret>${groupSecret(setup.secret)}</code>
+            <button type="button" class="btn btn-sm" data-totp="copy">Copy key</button>
+            <a class="btn btn-sm btn-ghost" data-uri href="${setup.uri}">Open in authenticator app</a>
+          </div>
+        </li>
+        <li>
+          <div class="security-form">
+            <div class="field">
+              <label for="totp-on-code">Code from the app</label>
+              <input class="input num" id="totp-on-code" data-code inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456">
+            </div>
+            <button type="button" class="btn btn-primary" data-totp="enable">Verify and turn on</button>
+            <button type="button" class="btn btn-ghost" data-totp="cancel">Cancel</button>
+          </div>
+        </li>
+      </ol>`);
+    const input = box.querySelector('[data-code]');
+    if (input) input.focus();
+  }
+
+  function readCode() {
+    const input = box.querySelector('[data-code]');
+    const code = input ? input.value.trim() : '';
+    if (!/^\d{6}$/.test(code)) {
+      notify.error('Enter the six-digit code from your authenticator app.');
+      if (input) {
+        input.setAttribute('aria-invalid', 'true');
+        input.focus();
+      }
+      return null;
+    }
+    return code;
+  }
+
+  async function act(button) {
+    const action = button.dataset.totp;
+    if (action === 'cancel') {
+      setup = null;
+      paint();
+      return;
+    }
+    if (action === 'copy') {
+      try {
+        await navigator.clipboard.writeText(setup.secret);
+        notify.ok('Setup key copied.');
+      } catch {
+        notify.error('Copy failed. Select the key and copy it manually.');
+      }
+      return;
+    }
+    let path;
+    let body;
+    if (action === 'setup') {
+      path = '/api/totp/setup';
+    } else {
+      const code = readCode();
+      if (!code) return;
+      path = action === 'enable' ? '/api/totp/enable' : '/api/totp/disable';
+      body = action === 'enable' ? { secret: setup.secret, code } : { code };
+    }
+    button.disabled = true;
+    try {
+      const res = await api.post(path, body);
+      if (action === 'setup') {
+        setup = res;
+      } else {
+        setup = null;
+        state = res;
+        notify.ok(action === 'enable' ? 'Two-factor sign-in is on. Sign-in now asks for a code after the password.' : 'Two-factor sign-in is off.');
+      }
+      paint();
+    } catch (err) {
+      notify.error(err);
+      button.disabled = false;
+    }
+  }
+
+  box.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-totp]');
+    if (button) act(button);
+  });
+  // The panel sits inside the settings form: Enter must verify the code, not save settings.
+  box.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || !event.target.matches('[data-code]')) return;
+    event.preventDefault();
+    const button = box.querySelector('[data-totp=enable], [data-totp=disable]');
+    if (button) act(button);
+  });
+  load();
 }
 
 function rangeText(f) {

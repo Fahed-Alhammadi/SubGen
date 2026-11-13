@@ -57,15 +57,16 @@ server. One container image works on CPU and NVIDIA GPUs.
 - **Studio:** drag and drop any video or audio file and download subtitles. No library needed.
 - **Subtitle editor:** video preview with live captions, timecode editing, split/merge, timing shift,
   find & replace, and readability warnings (reading speed, line length, overlaps).
-- **Model vault:** one-click recommended models, Hugging Face search, download progress.
+- **Model vault:** default models installed on first start, one-click recommended models, Hugging Face
+  search, download progress, and an offer to delete the old model when you switch.
 - **Queue:** filters, search, priorities, bulk cancel/retry/clear, per-file generation with
   audio-track and language overrides.
 - Settings editor generated from the backend's settings schema, provider connection tests, an audit
   log, and database backup and restore.
 
 **Security**
-- Single administrator with Argon2 password hashing, optional TOTP, login throttling, and session
-  revocation.
+- Single administrator with Argon2 password hashing, optional two-factor sign-in (TOTP, turned on from
+  **Settings → Security**), login throttling, and session revocation.
 - CSRF tokens on every mutation, a strict Content-Security-Policy (no inline scripts or styles), and
   path confinement for every file operation.
 - Runs as a non-root UID/GID with all capabilities dropped and `no-new-privileges`.
@@ -134,8 +135,9 @@ Open `http://127.0.0.1:8080` and sign in. When testing over plain HTTP on a LAN,
 
 ### First run
 
-1. **Models:** install a Whisper model (Small for CPU, Large v3 Turbo for GPU). Install NLLB-200 600M
-   if you want subtitles in a language other than the spoken one.
+1. **Models:** Whisper Small and NLLB-200 600M install automatically on first start (about 3 GB; jobs
+   wait until they finish). On a GPU, switch to Large v3 Turbo; SubGen then offers to delete the old
+   model or keep it.
 2. **Studio:** drop a short clip to check quality before touching your library.
 3. **Libraries:** add each mounted folder (the folder picker browses `/media`), choose target
    languages and formats, and select **Scan**.
@@ -155,8 +157,8 @@ The **Models** page lists recommended models with one-click install:
 | `Helsinki-NLP/opus-mt-*` | Translation | 0.3 GB | Fast single-pair models |
 
 Any CTranslate2 Whisper repository or Transformers seq2seq translation repository on Hugging Face can
-be installed from the search box. Downloads happen only when you start one, skip unused framework
-weights (TensorFlow, Flax, ONNX), and are stored under `SUBGEN_MODEL_PATH`:
+be installed from the search box. Downloads skip unused framework weights (TensorFlow, Flax, ONNX) and
+are stored under `SUBGEN_MODEL_PATH`:
 
 ```text
 data/models/
@@ -164,7 +166,10 @@ data/models/
 └── translation/facebook/nllb-200-distilled-600M/
 ```
 
-Jobs never download models implicitly. If a model is missing, the job fails with a clear message.
+The models in use are installed automatically when they are missing (on first start, Whisper Small and
+NLLB-200 600M); the queue waits while they download. Any model that is not in use, including the
+defaults, can be deleted. Set `SUBGEN_AUTO_INSTALL_MODELS=false` on servers without internet access and
+copy models into the folders above instead.
 
 ## Settings
 
@@ -240,10 +245,11 @@ See [.env.example](.env.example) for the full template.
 | `PUID`, `PGID` | Host filesystem identity |
 | `SUBGEN_ADMIN_USERNAME`, `SUBGEN_ADMIN_PASSWORD` | Administrator login (password ≥ 12 characters) |
 | `SUBGEN_SECRET_KEY` | Session-signing key (≥ 32 characters) |
-| `SUBGEN_TOTP_SECRET` | Optional Base32 secret for authenticator codes |
+| `SUBGEN_TOTP_SECRET` | Optional: enforce two-factor sign-in with this Base32 secret instead of enabling it in Settings |
 | `SUBGEN_MEDIA_PATH`, `SUBGEN_MODEL_PATH`, `SUBGEN_CONFIG_PATH` | Host directories |
 | `SUBGEN_WHISPER_DEVICE` | `auto`, `cpu` or `cuda` |
 | `SUBGEN_WHISPER_COMPUTE_TYPE` | `auto` (float16 on GPU, int8 on CPU) or any CTranslate2 type |
+| `SUBGEN_AUTO_INSTALL_MODELS` | Install the selected models when missing (default `true`; set `false` offline) |
 | `SUBGEN_MAX_UPLOAD_MB` | Studio upload limit (default 20480) |
 | `SUBGEN_WORKSPACE_DIR` | Studio upload storage (default `/config/workspace`) |
 | `SUBGEN_STABLE_FILE_SECONDS` | Wait before processing recently modified files |

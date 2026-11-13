@@ -64,7 +64,7 @@ def subtitle_update(job_id: int, cues: list[CueInput]):
                      key=lambda c: (c.start_ms, c.end_ms))
     with SessionLocal() as db:
         job, path = _subtitle_job(db, job_id)
-        write_subtitles(ordered, path, job.output_format, all_values(db))
+        write_subtitles(ordered, path, job.output_format, all_values(db), job.language)
         audit(db, "subtitle.edit", str(path), f"{len(cues)} cues")
         db.commit()
     return {"ok": True}

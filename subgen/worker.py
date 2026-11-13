@@ -11,6 +11,7 @@ from sqlalchemy import select
 from .config import get_settings
 from .db import Job, JobStatus, SessionLocal, utcnow
 from .media import library_root
+from .models import downloads, installing, whisper_repo
 from .paths import confined_path, sidecar_path
 from .pipeline import (
     Engine, JobCancelled, JobContext, Reporter, job_values, produce_cues, set_state, transcribe,
@@ -95,7 +96,7 @@ def _complete_siblings(
                 continue
             try:
                 output = _output_path(ctx, job.output_format)
-                write_subtitles(cues, output, job.output_format, values)
+                write_subtitles(cues, output, job.output_format, values, ctx.language)
             except (OSError, ValueError):
                 logger.exception("Could not write sibling subtitle %s", output)
                 continue
@@ -119,7 +120,7 @@ def run_job(ctx: JobContext, engine: Engine) -> None:
             raise ValueError("No speech was recognised in this file")
         reporter.update(stage="writing", progress=97, force=True)
         output = _output_path(ctx, ctx.output_format)
-        write_subtitles(cues, output, ctx.output_format, values)
+        write_subtitles(cues, output, ctx.output_format, values, ctx.language)
         _finish(ctx.job_id, JobStatus.COMPLETED, output=output)
         _complete_siblings(ctx, cues, values, transcript.language, transcript.duration_ms)
         set_state(state="idle", job_id=None)
@@ -132,11 +133,31 @@ def run_job(ctx: JobContext, engine: Engine) -> None:
         set_state(state="error", job_id=None, message=str(exc)[:500])
 
 
+def selected_models(values: dict[str, Any]) -> dict[str, str | None]:
+    translation = values["translation_model"] if values["translation_provider"] == "huggingface" else None
+    return {"whisper": whisper_repo(str(values["transcription_model"])), "translation": translation}
+
+
+def _model_being_installed() -> str | None:
+    """Jobs started while a selected model downloads would fail (and failed jobs are never retried)."""
+    if not downloads:
+        return None
+    with SessionLocal() as db:
+        return installing(selected_models(all_values(db)))
+
+
 def worker_loop(stop: threading.Event) -> None:
     engine = Engine()
     set_state(device=engine.device, compute_type=engine.compute)
     while not stop.is_set():
         try:
+            pending_model = _model_being_installed()
+            if pending_model:
+                set_state(state="loading", job_id=None, message=f"Waiting for {pending_model} to finish installing")
+                stop.wait(get_settings().worker_poll_seconds)
+                continue
+            if worker_state["state"] == "loading" and worker_state["job_id"] is None:
+                set_state(state="idle", message="")
             context = claim_next()
         except Exception:
             logger.exception("Could not read the job queue")

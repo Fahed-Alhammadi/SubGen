@@ -1,11 +1,15 @@
-# SubGen HTTP API (v0.4)
+# SubGen HTTP API (v0.5)
 
 All endpoints are same-origin JSON unless noted. The web UI is the only intended client.
 
 ## Conventions
 
-- **Auth:** `POST /api/login` sets two cookies: `subgen_session` (HttpOnly) and `subgen_csrf` (readable).
-  Every `POST`/`PUT`/`PATCH`/`DELETE` (except login) must send header `x-csrf-token: <subgen_csrf cookie>`.
+- **Auth:** a successful sign-in sets two cookies: `subgen_session` (HttpOnly) and `subgen_csrf` (readable).
+  Every `POST`/`PUT`/`PATCH`/`DELETE` (except the two login endpoints) must send header
+  `x-csrf-token: <subgen_csrf cookie>`.
+- **Pages:** the UI uses real paths (`/queue`, `/editor/12`, `/settings?tab=security`), no `#`. `/`, `/studio`,
+  `/libraries[/{id}]`, `/queue`, `/editor/{id}`, `/models`, `/settings` and `/system` serve the app; signed
+  out, they redirect to `/login?next=<path>`.
 - **401** → session missing/expired; the UI redirects to `/login`. Unauthenticated `/api/*` requests are
   rejected before their body is read.
 - **413** → request body too large: 1 MB for JSON endpoints, 64 MB for subtitle saves, `SUBGEN_MAX_UPLOAD_MB`
@@ -48,10 +52,17 @@ Hugging Face (NLLB) provider supports it; `whisper` means Whisper can transcribe
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
 | GET | `/login` | – | login HTML |
-| POST | `/api/login` | form: `username`, `password`, `totp_code` | `{ok}` |
+| POST | `/api/login` | form: `username`, `password`, optional `totp_code` | `{ok: true}`, or `{ok: false, totp_required: true}` + short-lived `subgen_pending` cookie when two-factor sign-in is on |
+| POST | `/api/login/totp` | form: `totp_code` (needs `subgen_pending`) | `{ok}`; 401 `"Sign-in expired…"` after 5 minutes |
 | POST | `/api/logout` | – | `{ok}` (revokes all sessions) |
 | GET | `/api/session` | – | `{user, version, totp_enabled}` |
 | GET | `/health` | – | `{status: "ok"}` (no auth) |
+| GET | `/api/totp` | – | `{enabled, managed_by_env}` |
+| POST | `/api/totp/setup` | – | `{secret, uri}` (`otpauth://` URI); nothing is stored yet. 409 if enabled |
+| POST | `/api/totp/enable` | `{secret, code}` | `{enabled, managed_by_env}`; 422 if the code does not match |
+| POST | `/api/totp/disable` | `{code}` | `{enabled, managed_by_env}`; 409 when set by `SUBGEN_TOTP_SECRET` |
+
+Login attempts (both steps) share the throttle. Codes are accepted once each (±30 s).
 
 ## Overview
 
@@ -180,6 +191,10 @@ and returns their ids. Existing sidecars are overwritten when the job completes.
 Validation: at least one cue, `0 ≤ start_ms < end_ms`, text ≤ 4000 chars, ≤ 20000 cues. Cues are saved sorted
 by start.
 
+Right-to-left languages (Arabic, Persian, Urdu, Pashto, Sindhi, Sorani, Hebrew, Yiddish): every line is written
+with a leading U+202B (right-to-left embedding) so players that lay lines out left-to-right still put
+punctuation at the end of the sentence. Reads strip bidi control characters, so `text` never contains them.
+
 ## Settings
 
 `GET /api/settings` →
@@ -222,8 +237,12 @@ keys (so secrets need not be resent).
  "downloads": [{"id": "ab12", "kind": "whisper", "repo_id": "…", "status": "downloading",
                 "error": null, "total_bytes": 486000000, "downloaded_bytes": 120000000, "progress": 24}],
  "recommended": [{"kind": "whisper", "repo_id": "Systran/faster-whisper-small", "name": "Whisper Small",
-                  "size": 486000000, "description": "…", "tags": ["balanced"], "installed": true}]}
+                  "size": 486000000, "description": "…", "tags": ["balanced"], "installed": true}],
+ "selected": [{"kind": "whisper", "repo_id": "Systran/faster-whisper-small", "installed": true},
+              {"kind": "translation", "repo_id": "facebook/nllb-200-distilled-600M", "installed": false}]}
 ```
+- `selected`: the models in use. A missing one is installed automatically (`SUBGEN_AUTO_INSTALL_MODELS`),
+  and the worker holds the queue while it downloads.
 - Download `status`: `queued | downloading | completed | failed`. `progress` is 0–100 or `null` when the size
   is unknown.
 
@@ -233,13 +252,13 @@ keys (so secrets need not be resent).
 | POST | `/api/models/download` | `{kind, repo_id}` | download object |
 | DELETE | `/api/models/downloads/{id}` | – | `{ok}` (dismiss a finished/failed entry) |
 | DELETE | `/api/models/{kind}/{owner}/{name}` | – | `{ok}` (409 if selected in settings) |
-| POST | `/api/models/select` | `{kind, repo_id}` | `{ok}` (sets it as the active model) |
+| POST | `/api/models/select` | `{kind, repo_id}` | `{ok, previous}`: `previous` is the replaced model if it is still installed (the UI offers to delete it), else `null` |
 
 ## System
 
 `GET /api/system` →
 ```json
-{"version": "0.4.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
+{"version": "0.5.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
  "device_mode": "auto", "compute_type": "auto",
  "gpus": [{"name": "NVIDIA RTX 4090", "memory_total": 25757220864, "memory_used": 1200000000}],
  "disks": [{"label": "Models", "path": "/models", "total": 0, "free": 0},
