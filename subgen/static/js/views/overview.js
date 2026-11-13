@@ -22,7 +22,7 @@ export async function mount(ctx) {
         subtitle: 'What the subtitle worker is doing right now.',
         actions: html`
           <button type="button" class="btn" data-action="scan-all">${icon('scan')}Scan all libraries</button>
-          <a class="btn btn-primary" href="#/studio">${icon('upload')}New upload</a>`,
+          <a class="btn btn-primary" href="/studio">${icon('upload')}New upload</a>`,
       })}
       <div class="overview">
         <section class="panel worker-card" aria-labelledby="ov-worker-h" data-slot="worker">${skeletonRows(3)}</section>
@@ -32,7 +32,7 @@ export async function mount(ctx) {
           <div class="panel-head">
             <h2 id="ov-active-h">Now processing and up next</h2>
             <span class="spacer"></span>
-            <a class="btn btn-ghost btn-sm" href="#/queue?status=active">Open queue${icon('chevron-right')}</a>
+            <a class="btn btn-ghost btn-sm" href="/queue?status=active">Open queue${icon('chevron-right')}</a>
           </div>
           <ol class="job-feed" data-slot="active" aria-live="off">${skeletonRows(3)}</ol>
         </section>
@@ -40,7 +40,7 @@ export async function mount(ctx) {
           <div class="panel-head">
             <h2 id="ov-recent-h">Recently finished</h2>
             <span class="spacer"></span>
-            <a class="btn btn-ghost btn-sm" href="#/queue">Full history${icon('chevron-right')}</a>
+            <a class="btn btn-ghost btn-sm" href="/queue">Full history${icon('chevron-right')}</a>
           </div>
           <ul class="recent-list" data-slot="recent">${skeletonRows(4)}</ul>
         </section>
@@ -121,10 +121,10 @@ function paintWorker(el, worker) {
         <dl class="dl worker-dl">
           <dt>Model</dt><dd class="break">${w.model || html`<span class="muted">Not loaded</span>`}</dd>
           <dt>Device</dt><dd>${w.device ? String(w.device).toUpperCase() : '—'}${w.compute_type ? html` <span class="muted">${w.compute_type}</span>` : ''}</dd>
-          <dt>Current job</dt><dd>${w.job_id ? html`<a href="#/queue?status=processing">#${w.job_id}</a>` : html`<span class="muted">None</span>`}</dd>
+          <dt>Current job</dt><dd>${w.job_id ? html`<a href="/queue?status=processing">#${w.job_id}</a>` : html`<span class="muted">None</span>`}</dd>
           <dt>Updated</dt><dd><time datetime="${w.updated_at || ''}">${w.updated_at ? relative(w.updated_at) : '—'}</time></dd>
         </dl>
-        ${w.state === 'error' && w.message ? html`<div class="callout" data-tone="danger" role="note">${icon('alert')}<div><strong>Last error</strong><pre class="error-text">${w.message}</pre><a href="#/models">Check installed models</a> or <a href="#/settings">review settings</a>.</div></div>` : ''}
+        ${w.state === 'error' && w.message ? html`<div class="callout" data-tone="danger" role="note">${icon('alert')}<div><strong>Last error</strong><pre class="error-text">${w.message}</pre><a href="/models">Check installed models</a> or <a href="/settings">review settings</a>.</div></div>` : ''}
       </div>`,
   );
 }
@@ -137,7 +137,7 @@ function paintLast24(el, s) {
       <div class="panel-head"><h2 id="ov-24-h">Last 24 hours</h2></div>
       <div class="panel-body last24-grid">
         <div><span class="big num">${number(s.completed || 0)}</span><span class="muted small">subtitles completed</span></div>
-        <div><span class="big num ${s.failed ? 'tone-danger' : ''}">${number(s.failed || 0)}</span><span class="muted small">failed${s.failed ? html` <a href="#/queue?status=failed">Review</a>` : ''}</span></div>
+        <div><span class="big num ${s.failed ? 'tone-danger' : ''}">${number(s.failed || 0)}</span><span class="muted small">failed${s.failed ? html` <a href="/queue?status=failed">Review</a>` : ''}</span></div>
         <div><span class="big num">${hours >= 1 ? (hours >= 10 ? hours.toFixed(0) : hours.toFixed(1)) : Math.round(hours * 60)}<small>${hours >= 1 ? 'h' : 'min'}</small></span><span class="muted small" title="${duration(s.audio_ms || 0)}">of audio transcribed</span></div>
       </div>`,
   );
@@ -150,12 +150,12 @@ function paintStats(el, d) {
   render(
     el,
     html`<div class="stat-strip">
-      ${tile('Libraries', d.libraries, 'libraries', '#/libraries')}
-      ${tile('Media files', d.media, 'film', '#/libraries')}
-      ${tile('Queued', j.queued, 'clock', '#/queue?status=queued')}
-      ${tile('Processing', j.processing, 'loader', '#/queue?status=processing')}
-      ${tile('Completed', j.completed, 'check', '#/queue?status=completed')}
-      ${tile('Failed', j.failed, 'x-circle', '#/queue?status=failed', j.failed ? 'failed' : '')}
+      ${tile('Libraries', d.libraries, 'libraries', '/libraries')}
+      ${tile('Media files', d.media, 'film', '/libraries')}
+      ${tile('Queued', j.queued, 'clock', '/queue?status=queued')}
+      ${tile('Processing', j.processing, 'loader', '/queue?status=processing')}
+      ${tile('Completed', j.completed, 'check', '/queue?status=completed')}
+      ${tile('Failed', j.failed, 'x-circle', '/queue?status=failed', j.failed ? 'failed' : '')}
     </div>`,
   );
 }
@@ -195,7 +195,7 @@ function paintActive(el, jobs) {
         compact: true,
         title: 'Nothing in the queue',
         text: 'Scan a library to find media without subtitles, or upload a file in Studio.',
-        action: html`<div class="row"><button type="button" class="btn" data-action="scan-all">${icon('scan')}Scan all libraries</button><a class="btn btn-ghost" href="#/studio">Open Studio</a></div>`,
+        action: html`<div class="row"><button type="button" class="btn" data-action="scan-all">${icon('scan')}Scan all libraries</button><a class="btn btn-ghost" href="/studio">Open Studio</a></div>`,
       })}</li>`,
     );
     return;

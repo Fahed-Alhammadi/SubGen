@@ -161,7 +161,7 @@ function libraryCard(lib, languages) {
     <div class="library-head">
       <span class="file-icon">${icon('folder')}</span>
       <div class="library-title">
-        <h2><a href="#/libraries/${lib.id}">${lib.name}</a></h2>
+        <h2><a href="/libraries/${lib.id}">${lib.name}</a></h2>
         <code class="library-path break">${lib.path}</code>
       </div>
       <label class="switch" title="${lib.enabled ? 'Watching this folder' : 'Paused'}">
@@ -184,7 +184,7 @@ function libraryCard(lib, languages) {
     <div class="library-foot">
       <span class="muted small">${lib.last_scan_at ? html`Scanned <time datetime="${lib.last_scan_at}" title="${dateTime(lib.last_scan_at)}">${relative(lib.last_scan_at)}</time>` : 'Not scanned yet'}</span>
       <span class="spacer"></span>
-      <a class="btn btn-sm" href="#/libraries/${lib.id}">${icon('film')}Browse</a>
+      <a class="btn btn-sm" href="/libraries/${lib.id}">${icon('film')}Browse</a>
       <button type="button" class="btn btn-sm" data-action="scan" data-id="${lib.id}">${icon('scan')}Scan</button>
       <button type="button" class="btn btn-sm btn-ghost btn-icon" data-action="edit" data-id="${lib.id}" aria-label="Edit ${lib.name}" title="Edit">${icon('edit')}</button>
       <button type="button" class="btn btn-sm btn-ghost btn-icon btn-danger" data-action="remove" data-id="${lib.id}" aria-label="Remove ${lib.name}" title="Remove">${icon('trash')}</button>

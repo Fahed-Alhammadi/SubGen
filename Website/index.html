@@ -291,7 +291,7 @@ everything that happened out there.</span></span><span class="warn">Reading spee
             <h3>Security</h3>
             <p>One administrator, configured from the environment, and a container that asks for as little as possible.</p>
             <dl>
-              <div><dt>Sign-in</dt><dd>Login throttling, optional TOTP two-factor codes, and sign-out that revokes every session.</dd></div>
+              <div><dt>Sign-in</dt><dd>Login throttling, optional two-factor codes you turn on in Settings, and sign-out that revokes every session.</dd></div>
               <div><dt>Request protection</dt><dd>Session-bound CSRF tokens on every change and a strict Content Security Policy in the web interface.</dd></div>
               <div><dt>Non-root container</dt><dd>Runs as your <code>PUID</code>/<code>PGID</code> with all Linux capabilities dropped, <code>no-new-privileges</code>, and no Docker socket.</dd></div>
               <div><dt>Contained file access</dt><dd>Writes and deletions are limited to subtitle files inside configured libraries.</dd></div>
@@ -379,7 +379,7 @@ everything that happened out there.</span></span><span class="warn">Reading spee
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/login.png">
-              <img src="assets/screenshots/login.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen sign-in page with username, password and an optional two-factor code field.">
+              <img src="assets/screenshots/login.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen sign-in page with username and password fields. The authenticator code is asked for on a second step when two-factor sign-in is on.">
               <span class="shot-fallback" aria-hidden="true"><b>Sign in</b>Screenshot coming soon</span>
             </a>
             <figcaption><b>Sign in.</b> A single administrator account with optional two-factor codes.</figcaption>

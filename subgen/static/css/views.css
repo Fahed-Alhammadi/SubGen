@@ -39,6 +39,9 @@
   font-size: var(--fs-sm);
 }
 .callout > .icon { color: var(--danger); margin-top: 2px; }
+.callout[data-tone="info"] { background: var(--signal-soft); }
+.callout[data-tone="info"] > .icon { color: var(--signal); }
+.missing-model { margin-top: 0; }
 .callout > div { display: grid; gap: var(--s-2); min-width: 0; }
 .callout pre.error-text { background: transparent; padding: 0; max-height: 8rem; }
 
@@ -663,40 +666,9 @@
   letter-spacing: -0.02em;
 }
 .login-brand .brand-mark { width: 32px; height: 32px; }
-.login-reel {
-  display: grid;
-  gap: var(--s-2);
-  padding: var(--s-3) var(--s-4);
-  border-left: 3px solid var(--signal-fill);
-  font-size: var(--fs-lg);
-  font-weight: 560;
-  line-height: 1.35;
-}
-.login-cue { display: grid; gap: 2px; }
-.login-cue .tc { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted); font-weight: 500; }
-.login-track {
-  position: relative;
-  height: 6px;
-  margin-top: var(--s-1);
-  border-radius: 2px;
-  background-color: var(--sunken);
-  background-image: repeating-linear-gradient(90deg, var(--tick) 0 1px, transparent 1px 10%);
-}
-.login-track span {
-  position: absolute;
-  inset: 0 38% 0 0;
-  border-radius: 2px 0 0 2px;
-  background: var(--signal-fill);
-}
-.login-track span::after {
-  content: "";
-  position: absolute;
-  right: -1px;
-  top: -3px;
-  bottom: -3px;
-  width: 2px;
-  background: var(--text);
-}
+.login-card [data-step] { display: grid; gap: var(--s-4); }
+.login-card [data-step][hidden] { display: none; }
+.login-back { justify-self: center; }
 .login-card {
   display: grid;
   gap: var(--s-4);
@@ -726,3 +698,21 @@
   min-width: 0;
 }
 .generate-target .name { color: var(--text); font-weight: 560; }
+
+/* Settings → Security (two-factor sign-in) */
+.security { display: grid; gap: var(--s-4); max-width: 46rem; padding: var(--s-4); }
+.security .callout { margin-top: 0; }
+.security-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-4); }
+.security-row h3 { font-size: var(--fs-md); }
+.security-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); }
+.security-form .field { flex: 0 1 16rem; }
+.security-steps { display: grid; gap: var(--s-4); padding-left: 1.25rem; }
+.security-steps li { display: grid; gap: var(--s-2); }
+.security-secret { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.security-secret code {
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-2);
+  background: var(--sunken);
+  font-size: var(--fs-md);
+  letter-spacing: 0.04em;
+}

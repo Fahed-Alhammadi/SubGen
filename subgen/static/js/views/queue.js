@@ -148,7 +148,7 @@ export async function mount(ctx) {
               iconName: 'queue',
               title: 'The queue is empty',
               text: 'Jobs appear here when a library scan finds media without subtitles or when you generate subtitles from Studio.',
-              action: html`<div class="row"><a class="btn btn-primary" href="#/libraries">${icon('libraries')}Go to libraries</a><a class="btn" href="#/studio">Open Studio</a></div>`,
+              action: html`<div class="row"><a class="btn btn-primary" href="/libraries">${icon('libraries')}Go to libraries</a><a class="btn" href="/studio">Open Studio</a></div>`,
             }),
       );
       return;
@@ -375,7 +375,7 @@ export async function mount(ctx) {
     dlg.el.addEventListener('click', (event) => {
       const target = event.target.closest('[data-action]');
       if (target && handlers[target.dataset.action]) handlers[target.dataset.action](target, event);
-      else if (event.target.closest('a[href^="#/editor"]')) dlg.close();
+      else if (event.target.closest('a[href^="/editor"]')) dlg.close();
     });
   }
 

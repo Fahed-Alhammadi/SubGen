@@ -32,10 +32,10 @@ class Settings(BaseSettings):
     worker_poll_seconds: int = 3
     max_upload_mb: int = 20480
     max_media_hours: float = 12.0
-    whisper_model: str = "Systran/faster-whisper-small"
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"
-    translation_model: str = "facebook/nllb-200-distilled-600M"
+    # Download the selected (default) models on first start when they are missing.
+    auto_install_models: bool = True
     log_level: str = "INFO"
 
     @field_validator("admin_password")

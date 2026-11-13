@@ -28,7 +28,10 @@ def _selected() -> dict[str, str]:
 def models():
     selected = _selected()
     installed = [{**m, "in_use": selected.get(str(m["kind"])) == m["repo_id"]} for m in list_models()]
-    return {"installed": installed, "downloads": list_downloads(), "recommended": recommended()}
+    return {
+        "installed": installed, "downloads": list_downloads(), "recommended": recommended(),
+        "selected": [{"kind": kind, "repo_id": repo, "installed": is_installed(kind, repo)} for kind, repo in selected.items()],
+    }
 
 
 @router.get("/api/models/search")
@@ -68,6 +71,7 @@ def dismiss(download_id: str):
 def select_model(payload: ModelInput):
     if not is_installed(payload.kind, payload.repo_id):
         raise HTTPException(404, "Install the model before selecting it")
+    previous = _selected().get(payload.kind)
     values = {"transcription_model": payload.repo_id} if payload.kind == "whisper" else {
         "translation_model": payload.repo_id, "translation_provider": "huggingface",
     }
@@ -75,7 +79,9 @@ def select_model(payload: ModelInput):
         set_values(db, values)
         audit(db, "model.select", f"{payload.kind}:{payload.repo_id}")
         db.commit()
-    return {"ok": True}
+    # The model it replaced can now be deleted; the UI offers to delete or keep it.
+    replaced = previous if previous and previous != payload.repo_id and is_installed(payload.kind, previous) else None
+    return {"ok": True, "previous": replaced}
 
 
 @router.delete("/api/models/{kind}/{owner}/{name}")

@@ -29,7 +29,8 @@ let redirecting = false;
 function goToLogin() {
   if (redirecting) return;
   redirecting = true;
-  window.location.assign('/login');
+  const here = `${window.location.pathname}${window.location.search}`;
+  window.location.assign(here === '/' ? '/login' : `/login?next=${encodeURIComponent(here)}`);
 }
 
 function errorMessage(data, response) {

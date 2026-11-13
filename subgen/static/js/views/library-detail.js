@@ -30,7 +30,7 @@ export async function mount(ctx) {
   let loaded = false;
   let missing = false; // the library list loaded and this id is not in it
 
-  render(root, html`<div data-slot="header">${pageHeader({ title: 'Library', crumb: { href: '#/libraries', label: 'Libraries' } })}</div>
+  render(root, html`<div data-slot="header">${pageHeader({ title: 'Library', crumb: { href: '/libraries', label: 'Libraries' } })}</div>
     <section class="panel" aria-label="Media files">
       <div class="toolbar">
         <div class="input-group">
@@ -64,14 +64,14 @@ export async function mount(ctx) {
   function paintHeader() {
     ctx.setTitle(library ? library.name : 'Library');
     if (missing) {
-      render(headerEl, pageHeader({ title: 'Library not found', crumb: { href: '#/libraries', label: 'Libraries' } }));
+      render(headerEl, pageHeader({ title: 'Library not found', crumb: { href: '/libraries', label: 'Libraries' } }));
       render(
         headerEl.nextElementSibling,
         emptyState({
           iconName: 'libraries',
           title: 'This library does not exist',
           text: 'It may have been removed. Pick another library from the list.',
-          action: html`<a class="btn btn-primary" href="#/libraries">Go to libraries</a>`,
+          action: html`<a class="btn btn-primary" href="/libraries">Go to libraries</a>`,
         }),
       );
       return;
@@ -80,7 +80,7 @@ export async function mount(ctx) {
       headerEl,
       pageHeader({
         title: library ? library.name : 'Library',
-        crumb: { href: '#/libraries', label: 'Libraries' },
+        crumb: { href: '/libraries', label: 'Libraries' },
         subtitle: library
           ? html`<span class="subtitle-meta"><code>${library.path}</code><span>${number(library.media_count || 0)} files, ${library.last_scan_at ? html`scanned ${relative(library.last_scan_at)}` : 'not scanned yet'}${library.enabled ? '' : ', paused'}</span></span>`
           : '',

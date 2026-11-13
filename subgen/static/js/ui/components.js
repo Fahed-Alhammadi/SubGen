@@ -108,7 +108,7 @@ export function subtitleChip(sub) {
   const state = subtitleState(sub);
   const inner = html`${icon(CHIP_ICON[state], { cls: state === 'processing' ? 'spin' : '' })}${String(sub.language).toUpperCase()}<span class="fmt">${sub.format}</span><span class="sr-only">${CHIP_TEXT[state]}</span>`;
   if (state === 'complete' && sub.job_id) {
-    return html`<a class="chip" data-state="${state}" href="#/editor/${sub.job_id}" title="Edit ${sub.language}.${sub.format}">${inner}</a>`;
+    return html`<a class="chip" data-state="${state}" href="/editor/${sub.job_id}" title="Edit ${sub.language}.${sub.format}">${inner}</a>`;
   }
   return html`<span class="chip" data-state="${state}" title="${sub.language}.${sub.format}: ${CHIP_TEXT[state]}">${inner}</span>`;
 }

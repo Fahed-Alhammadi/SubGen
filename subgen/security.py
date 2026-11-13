@@ -1,4 +1,5 @@
 import base64
+import binascii
 import hashlib
 import hmac
 import ipaddress
@@ -13,10 +14,16 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pwdlib import PasswordHash
 
 from .config import get_settings
+from .db import AppSetting, SessionLocal, utcnow
 
 settings = get_settings()
 hasher = PasswordHash.recommended()
 serializer = URLSafeTimedSerializer(settings.secret_key.get_secret_value(), salt="subgen-session")
+# Proves the password step passed; only the authenticator code is asked for next.
+pending_serializer = URLSafeTimedSerializer(settings.secret_key.get_secret_value(), salt="subgen-totp-pending")
+PENDING_SECONDS = 300
+LOGIN_PATHS = {"/api/login", "/api/login/totp"}  # exempt from CSRF tokens (no session exists yet)
+TOTP_KEY = "auth_totp_secret"  # app_settings row; not part of the pipeline settings schema
 admin_password_hash = hasher.hash(settings.admin_password.get_secret_value())
 login_attempts: dict[str, deque[float]] = defaultdict(deque)
 session_generation = secrets.token_hex(16)
@@ -106,24 +113,70 @@ def _totp_at(secret: str, counter: int) -> str:
     return f"{value:06d}"
 
 
-def verify_totp(code: str) -> bool:
+def new_totp_secret() -> str:
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
+
+
+def totp_uri(secret: str) -> str:
+    from urllib.parse import quote
+
+    label = quote(f"SubGen:{settings.admin_username}", safe=":@")
+    return f"otpauth://totp/{label}?secret={secret}&issuer=SubGen&algorithm=SHA1&digits=6&period=30"
+
+
+def totp_managed_by_env() -> bool:
+    return settings.totp_secret is not None
+
+
+def totp_secret() -> str | None:
+    """The active secret: SUBGEN_TOTP_SECRET when set, otherwise the one enabled in Settings."""
+    if settings.totp_secret is not None:
+        return settings.totp_secret.get_secret_value()
+    with SessionLocal() as db:
+        row = db.get(AppSetting, TOTP_KEY)
+        return row.value if row and row.value else None
+
+
+def totp_enabled() -> bool:
+    return totp_secret() is not None
+
+
+def store_totp_secret(secret: str | None) -> None:
+    with SessionLocal() as db:
+        row = db.get(AppSetting, TOTP_KEY)
+        if secret is None:
+            if row:
+                db.delete(row)
+        elif row:
+            row.value, row.updated_at = secret, utcnow()
+        else:
+            db.add(AppSetting(key=TOTP_KEY, value=secret))
+        db.commit()
+
+
+def verify_totp(code: str, secret: str | None = None) -> bool:
     """Accept the current, previous or next 30-second code, each at most once."""
     global _last_totp_counter
-    if settings.totp_secret is None:
+    secret = secret if secret is not None else totp_secret()
+    if secret is None:
         return True
-    secret = settings.totp_secret.get_secret_value()
+    code = code.strip()
+    if len(code) != 6 or not code.isdigit():
+        return False
     now = int(time.time()) // 30
     try:
-        for counter in (now - 1, now, now + 1):
-            if counter > _last_totp_counter and _equal(code, _totp_at(secret, counter)):
-                _last_totp_counter = counter
-                return True
-    except (ValueError, TypeError):
+        with _login_lock:
+            for counter in (now - 1, now, now + 1):
+                if counter > _last_totp_counter and _equal(code, _totp_at(secret, counter)):
+                    _last_totp_counter = counter
+                    return True
+    except (ValueError, TypeError, binascii.Error):
         return False
     return False
 
 
-def authenticate(username: str, password: str, totp_code: str = "") -> bool:
+def authenticate(username: str, password: str) -> bool:
+    """Check the username and password (the first sign-in step)."""
     if not _verify_slots.acquire(timeout=10):
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Server busy; try again")
     try:
@@ -131,7 +184,19 @@ def authenticate(username: str, password: str, totp_code: str = "") -> bool:
         password_ok = hasher.verify(password, admin_password_hash)
     finally:
         _verify_slots.release()
-    return username_ok and password_ok and verify_totp(totp_code)
+    return username_ok and password_ok
+
+
+def pending_token() -> str:
+    return pending_serializer.dumps({"user": settings.admin_username, "generation": session_generation})
+
+
+def pending_valid(token: str) -> bool:
+    try:
+        payload = pending_serializer.loads(token, max_age=PENDING_SECONDS)
+    except (BadSignature, SignatureExpired):
+        return False
+    return payload.get("user") == settings.admin_username and payload.get("generation") == session_generation
 
 
 def session_token() -> tuple[str, str]:
@@ -166,7 +231,7 @@ def is_authenticated(request: Request) -> bool:
 
 
 def require_csrf(request: Request) -> None:
-    if request.method not in {"POST", "PUT", "PATCH", "DELETE"} or request.url.path == "/api/login":
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"} or request.url.path in LOGIN_PATHS:
         return
     payload = session_payload(request)
     header = request.headers.get("x-csrf-token", "")

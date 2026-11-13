@@ -19,6 +19,12 @@ IGNORE_PATTERNS = [
     "onnx/*", "openvino/*", "coreml/*", "tf_model*", "flax_model*", "rust_model*", "*.md", ".gitattributes",
 ]
 
+# Installed automatically on first start (SUBGEN_AUTO_INSTALL_MODELS) and selected until the user
+# picks another model on the Models page. Once another model is in use, these can be deleted.
+DEFAULT_WHISPER_MODEL = "Systran/faster-whisper-small"
+DEFAULT_TRANSLATION_MODEL = "facebook/nllb-200-distilled-600M"
+AUTO_INSTALL_RETRY_SECONDS = 3600
+
 RECOMMENDED = [
     ("whisper", "Systran/faster-whisper-tiny", "Whisper Tiny", 75_000_000,
      "Fastest and least accurate. Good for testing the pipeline.", ["fastest"]),
@@ -59,6 +65,7 @@ class Download:
 
 downloads: dict[str, Download] = {}
 _lock = threading.Lock()
+_auto_attempts: dict[tuple[str, str], float] = {}
 
 
 def model_path(kind: str, repo_id: str) -> Path:
@@ -235,3 +242,39 @@ def delete_model(kind: str, repo_id: str) -> None:
     owner = target.parent
     if owner.is_dir() and not any(owner.iterdir()):
         owner.rmdir()
+
+
+def installing(selected: dict[str, str | None]) -> str | None:
+    """The repository id of a selected model that is downloading right now, if any."""
+    wanted = {(kind, repo) for kind, repo in selected.items() if repo}
+    for item in list(downloads.values()):
+        if item.status in {"queued", "downloading"} and (item.kind, item.repo_id) in wanted:
+            return item.repo_id
+    return None
+
+
+def ensure_selected_models(selected: dict[str, str | None]) -> list[str]:
+    """Download each selected model that is missing, so a fresh install works without manual steps.
+
+    ``selected`` maps a kind to its repository id (``None`` skips the kind, e.g. when translation uses
+    Ollama). Failed attempts are retried at most once an hour; an offline server just logs a warning.
+    """
+    import time
+
+    started: list[str] = []
+    for kind, repo_id in selected.items():
+        if not repo_id or kind not in KINDS or is_installed(kind, repo_id):
+            continue
+        key, now = (kind, repo_id), time.monotonic()
+        last = _auto_attempts.get(key)
+        if last is not None and now - last < AUTO_INSTALL_RETRY_SECONDS:
+            continue
+        _auto_attempts[key] = now
+        try:
+            start_download(kind, repo_id)
+        except ValueError as exc:  # already downloading, or not a valid repository id
+            logger.info("Not auto-installing %s: %s", repo_id, exc)
+            continue
+        logger.info("Installing the selected %s model %s", kind, repo_id)
+        started.append(repo_id)
+    return started

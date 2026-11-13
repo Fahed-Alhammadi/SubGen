@@ -1,6 +1,7 @@
 """Reading, writing and discovering subtitle sidecar files."""
 
 import os
+import re
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
@@ -11,10 +12,31 @@ from .segmentation import Cue
 SIDECAR_EXTENSIONS = {".srt", ".ass", ".ssa", ".vtt", ".sub", ".idx", ".sup", ".smi"}
 # Tokens in sidecar names that describe the subtitle rather than its language.
 _DESCRIPTORS = {"forced", "sdh", "hi", "cc", "default", "full", "signs", "songs", "subs", "sub"}
+# Right-to-left subtitle languages (Arabic, Hebrew, Persian, Urdu, ...).
+RTL_LANGUAGES = {"ar", "fa", "ur", "ps", "sd", "ckb", "ug", "he", "yi", "dv"}
+_RLE = "\u202b"  # RIGHT-TO-LEFT EMBEDDING
+_BIDI_CONTROLS = re.compile("[\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 
 
-def write_subtitles(cues: list[Cue], path: Path, output_format: str, style: dict[str, Any]) -> None:
+def mark_rtl(text: str) -> str:
+    """Make every line lay out right-to-left, whatever the player's default direction.
+
+    Many players (TVs, Plex, libass for .ass) lay out each line left-to-right, so a sentence's final
+    "." or "؟" lands on the right edge, which is where Arabic text starts. A leading RLE embeds the
+    line as right-to-left, so punctuation stays at the end of the sentence (its left side).
+    """
+    return "\n".join(_RLE + line if line else line for line in strip_bidi(text).split("\n"))
+
+
+def strip_bidi(text: str) -> str:
+    return _BIDI_CONTROLS.sub("", text)
+
+
+def write_subtitles(
+    cues: list[Cue], path: Path, output_format: str, style: dict[str, Any], language: str | None = None
+) -> None:
     """Atomically write cues as SRT, ASS or WebVTT so a crash never leaves a partial file."""
+    rtl = languages.normalize(language or "") in RTL_LANGUAGES
     import pysubs2
 
     document = pysubs2.SSAFile()
@@ -26,7 +48,7 @@ def write_subtitles(cues: list[Cue], path: Path, output_format: str, style: dict
         default.outline, default.shadow, default.marginv = 3.0, 1.0, 60
     for cue in cues:
         event = pysubs2.SSAEvent(start=cue.start_ms, end=cue.end_ms)
-        event.plaintext = cue.text
+        event.plaintext = mark_rtl(cue.text) if rtl else cue.text
         document.append(event)
     encoding = "utf-8-sig" if output_format == "srt" and style.get("srt_utf8_bom") else "utf-8"
     with NamedTemporaryFile(
@@ -57,7 +79,7 @@ def read_subtitles(path: Path) -> list[Cue]:
         return []
     document = pysubs2.load(str(path), encoding="utf-8")
     return [
-        Cue(event.start, event.end, event.plaintext)
+        Cue(event.start, event.end, strip_bidi(event.plaintext))
         for event in document
         if not event.is_comment
     ]

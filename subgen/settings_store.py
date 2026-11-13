@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from .config import get_settings
 from .db import AppSetting, utcnow
 from .languages import LANGUAGES
+from .models import DEFAULT_TRANSLATION_MODEL, DEFAULT_WHISPER_MODEL
 
 # owner/model repository ids, or faster-whisper aliases such as "small" or "large-v3".
 _MODEL_NAME = re.compile(r"^(?!.*\.\.)([A-Za-z0-9][A-Za-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -42,7 +43,7 @@ def _schema() -> list[Field]:
     env = get_settings()
     return [
         # Transcription
-        Field("transcription_model", "transcription", "Whisper model", "model", env.whisper_model,
+        Field("transcription_model", "transcription", "Whisper model", "model", DEFAULT_WHISPER_MODEL,
               "Installed faster-whisper (CTranslate2) model used for speech recognition. Larger models "
               "are more accurate but slower.", model_kind="whisper", max_length=200),
         Field("source_language", "transcription", "Spoken language", "language", "auto",
@@ -96,7 +97,7 @@ def _schema() -> list[Field]:
               "Engine used when the target language differs from the spoken language.",
               options=(("huggingface", "Local Hugging Face model"), ("ollama", "Ollama (local LLM)"),
                        ("libretranslate", "LibreTranslate"))),
-        Field("translation_model", "translation", "Local translation model", "model", env.translation_model,
+        Field("translation_model", "translation", "Local translation model", "model", DEFAULT_TRANSLATION_MODEL,
               "NLLB-200, M2M100 or Marian (OPUS-MT) model installed in the model vault.",
               model_kind="translation", max_length=200),
         Field("translation_batch_size", "translation", "Translation batch size", "int", 16,

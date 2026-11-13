@@ -4,6 +4,7 @@ import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -17,14 +18,17 @@ from .config import get_settings
 from .db import AuditEvent, Library, SessionLocal, init_db, utcnow
 from .guard import RequestGuard
 from .media import cleanup_workspace, scan_library, workspace_library
+from .models import ensure_selected_models
 from .security import is_authenticated, require_csrf
 from .settings_store import all_values
-from .worker import recover_interrupted_jobs, worker_loop
+from .worker import recover_interrupted_jobs, selected_models, worker_loop
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("subgen")
 stop_event = threading.Event()
 static_path = Path(__file__).parent / "static"
+
+APP_SECTIONS = {"studio", "libraries", "queue", "editor", "models", "settings", "system"}
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; "
@@ -33,13 +37,23 @@ CONTENT_SECURITY_POLICY = (
 )
 
 
+def _install_selected_models(values: dict) -> None:
+    if not get_settings().auto_install_models:
+        return
+    ensure_selected_models(selected_models(values))
+
+
 def maintenance_loop() -> None:
-    """Scheduled library scans and Studio upload expiry."""
+    """Scheduled library scans, Studio upload expiry and installing missing selected models."""
     last_scan = 0.0
     while not stop_event.is_set():
         try:
             with SessionLocal() as db:
                 values = all_values(db)
+                try:
+                    _install_selected_models(values)
+                except Exception:
+                    logger.exception("Could not start installing the selected models")
                 cleanup_workspace(db, int(values["upload_retention_hours"]))
                 db.execute(delete(AuditEvent).where(AuditEvent.created_at < utcnow() - timedelta(days=180)))
                 db.commit()
@@ -109,20 +123,38 @@ async def security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
-    if request.url.path.startswith("/api/") or request.url.path in ("/", "/login"):
+    if not request.url.path.startswith("/static/"):
         response.headers.setdefault("Cache-Control", "no-store")
     return response
 
 
-@app.get("/", include_in_schema=False)
-def home(request: Request):
+def _app_page(request: Request):
     if not is_authenticated(request):
-        return RedirectResponse("/login", status_code=303)
+        target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        suffix = "" if target == "/" else f"?next={quote(target, safe='/')}"
+        return RedirectResponse(f"/login{suffix}", status_code=303)
     return FileResponse(static_path / "index.html")
 
 
+@app.get("/", include_in_schema=False)
+def home(request: Request):
+    return _app_page(request)
+
+
 @app.get("/login", include_in_schema=False)
-def login_page(request: Request):
+def login_page(request: Request, next: str = "/"):
     if is_authenticated(request):
-        return RedirectResponse("/", status_code=303)
+        # Only same-site paths: "//host" and "/\\host" would leave the site.
+        safe = next.startswith("/") and not next.startswith(("//", "/\\"))
+        return RedirectResponse(next if safe else "/", status_code=303)
     return FileResponse(static_path / "login.html")
+
+
+# Client-side routes use real paths (/queue, /editor/12), so a reload or bookmark must serve the app.
+# Registered last so /login, /health and the API routes keep precedence.
+@app.get("/{section}", include_in_schema=False)
+@app.get("/{section}/{item}", include_in_schema=False)
+def app_route(request: Request, section: str, item: str | None = None):
+    if section not in APP_SECTIONS or (item is not None and not item.isdigit()):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    return _app_page(request)

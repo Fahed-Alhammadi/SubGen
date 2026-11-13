@@ -75,7 +75,7 @@ export function jobActionButtons(job, { compact = true, include = null } = {}) {
     html`<button type="button" class="btn btn-ghost btn-sm ${compact ? 'btn-icon' : ''} ${extra}" data-action="${action}" data-id="${job.id}" aria-label="${label}" title="${label}">${icon(iconName)}${compact ? '' : html`<span>${label}</span>`}</button>`;
   const out = [];
   if (job.status === 'completed') {
-    if (want('edit')) out.push(html`<a class="btn btn-ghost btn-sm ${compact ? 'btn-icon' : ''}" href="#/editor/${job.id}" aria-label="Edit subtitle" title="Edit subtitle">${icon('edit')}${compact ? '' : html`<span>Edit</span>`}</a>`);
+    if (want('edit')) out.push(html`<a class="btn btn-ghost btn-sm ${compact ? 'btn-icon' : ''}" href="/editor/${job.id}" aria-label="Edit subtitle" title="Edit subtitle">${icon('edit')}${compact ? '' : html`<span>Edit</span>`}</a>`);
     if (want('download')) out.push(html`<a class="btn btn-ghost btn-sm ${compact ? 'btn-icon' : ''}" href="${downloadUrl(job.id)}" download aria-label="Download subtitle" title="Download subtitle">${icon('download')}${compact ? '' : html`<span>Download</span>`}</a>`);
     if (want('regenerate')) out.push(b('regenerate', 'scan', 'Regenerate'));
     if (want('delete-subtitle')) out.push(b('delete-subtitle', 'trash', 'Delete subtitle file', 'btn-danger'));
