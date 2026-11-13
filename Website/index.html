@@ -64,7 +64,7 @@
               View source on GitHub
             </a>
           </div>
-          <p class="hero-note">New in 0.4: a subtitle-quality engine, drag-and-drop Studio, and a built-in editor. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
+          <p class="hero-note">New in 0.5: two-factor sign-in from Settings, default models that install themselves, and correct punctuation in Arabic subtitles. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
         </div>
 
         <figure class="player" id="player" aria-labelledby="player-caption">
@@ -120,7 +120,7 @@ the tide comes in.</b></span></p>
       <div class="wrap">
         <div class="section-head">
           <h2 id="features-title">Everything between the audio track and a finished subtitle file</h2>
-          <p>SubGen 0.4 rebuilds the pipeline around subtitle quality: cues that read well, no wasted transcription, and proper tools for fixing the last few lines by hand.</p>
+          <p>SubGen builds the pipeline around subtitle quality: cues that read well, no wasted transcription, and proper tools for fixing the last few lines by hand.</p>
         </div>
 
         <article class="feature" aria-labelledby="f-local">
@@ -130,7 +130,7 @@ the tide comes in.</b></span></p>
             <ul class="ticks">
               <li><strong>faster-whisper</strong> transcribes from the media audio, picking CUDA automatically when a GPU is present.</li>
               <li><strong>Local translation</strong> with Hugging Face models stored on your disk, or your own Ollama or LibreTranslate server.</li>
-              <li><strong>No surprise downloads.</strong> Models download only when you click install. If a model is missing, the job fails visibly instead of reaching out.</li>
+              <li><strong>Predictable downloads.</strong> Only the models you use are downloaded: the two defaults on first start, and any other model when you click install. Jobs never download anything, and one setting turns automatic installs off for offline servers.</li>
             </ul>
           </div>
           <div class="artifact">
@@ -153,7 +153,7 @@ the tide comes in.</b></span></p>
               </div>
               <div>
                 <dt>Internet needed</dt>
-                <dd>Only while you download a model. Generation works fully offline.</dd>
+                <dd>Only while models download (the defaults on first start). Generation works fully offline.</dd>
               </div>
             </dl>
           </div>
@@ -281,7 +281,7 @@ everything that happened out there.</span></span><span class="warn">Reading spee
             <h3>Day to day</h3>
             <p>Manage models, the queue and settings from the browser, without opening a shell.</p>
             <dl>
-              <div><dt>Model vault</dt><dd>Install recommended Whisper and translation models in one click and watch the download progress.</dd></div>
+              <div><dt>Model vault</dt><dd>Default models install on first start. Install others in one click, watch the download progress, and delete the old model when you switch.</dd></div>
               <div><dt>Queue</dt><dd>Priorities, cancel, retry and regenerate, bulk actions across many jobs, plus live speed and time remaining.</dd></div>
               <div><dt>Settings</dt><dd>Grouped, validated options for transcription, segmentation, translation, scanning, output and the Studio workspace, each with a reset to default.</dd></div>
               <div><dt>Activity and backups</dt><dd>A searchable audit log of edits, deletions, settings changes and sign-ins, with one-click database backup and validated restore.</dd></div>
@@ -427,13 +427,13 @@ SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
             </div>
           </li>
           <li>
-            <h3>Install a model and add a library</h3>
-            <p>Open <code>http://127.0.0.1:8080</code> and sign in. In the Model vault, install a recommended Whisper model, plus a translation model if you want local translation. Then add each mounted folder under Libraries, choose its languages and formats, and select Scan now.</p>
+            <h3>Let the models install and add a library</h3>
+            <p>Open <code>http://127.0.0.1:8080</code> and sign in. Whisper Small and NLLB-200 600M install by themselves on first start (about 3 GB); the Model vault shows the progress. On a GPU, switch to a larger Whisper model there. Then add each mounted folder under Libraries, choose its languages and formats, and select Scan now.</p>
           </li>
         </ol>
 
         <div class="callout">
-          <p><strong>Updating.</strong> Back up <code>/config</code>, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version with <code>SUBGEN_IMAGE=ghcr.io/fahed-alhammadi/subgen:0.4</code> in <code>.env</code>.</p>
+          <p><strong>Updating.</strong> Back up <code>/config</code>, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version with <code>SUBGEN_IMAGE=ghcr.io/fahed-alhammadi/subgen:0.5</code> in <code>.env</code>.</p>
           <p><strong>Remote access.</strong> Keep the default localhost bind and put SubGen behind an HTTPS reverse proxy. Mount extra libraries as separate paths below <code>/media</code>.</p>
         </div>
       </div>
@@ -449,7 +449,7 @@ SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
           <details>
             <summary>Does SubGen send my media or audio anywhere?</summary>
             <div class="answer">
-              <p>No. Transcription and the built-in translation provider run inside the container using models on your disk. The only outbound traffic is a model download you start yourself. If you configure Ollama or LibreTranslate, subtitle text goes to the address you enter, which is usually another container on the same machine.</p>
+              <p>No. Transcription and the built-in translation provider run inside the container using models on your disk. The only outbound traffic is model downloads: the default models on first start, and any model you install. Set <code>SUBGEN_AUTO_INSTALL_MODELS=false</code> to stop the automatic ones. If you configure Ollama or LibreTranslate, subtitle text goes to the address you enter, which is usually another container on the same machine.</p>
             </div>
           </details>
           <details>
