@@ -64,7 +64,7 @@
               View source on GitHub
             </a>
           </div>
-          <p class="hero-note">New in 0.5: two-factor sign-in from Settings, default models that install themselves, and correct punctuation in Arabic subtitles. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
+          <p class="hero-note">New in 0.6: SubGen is now MIT licensed, frees GPU memory when idle, and checks disk space before uploads and model downloads. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
         </div>
 
         <figure class="player" id="player" aria-labelledby="player-caption">
@@ -131,6 +131,7 @@ the tide comes in.</b></span></p>
               <li><strong>faster-whisper</strong> transcribes from the media audio, picking CUDA automatically when a GPU is present.</li>
               <li><strong>Local translation</strong> with Hugging Face models stored on your disk, or your own Ollama or LibreTranslate server.</li>
               <li><strong>Predictable downloads.</strong> Only the models you use are downloaded: the two defaults on first start, and any other model when you click install. Jobs never download anything, and one setting turns automatic installs off for offline servers.</li>
+              <li><strong>Gentle on shared hardware.</strong> Jobs run one at a time, models are unloaded after 15 idle minutes to free GPU memory, and uploads and downloads stop before the disk fills up.</li>
             </ul>
           </div>
           <div class="artifact">
@@ -433,7 +434,7 @@ SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
         </ol>
 
         <div class="callout">
-          <p><strong>Updating.</strong> Back up <code>/config</code>, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version with <code>SUBGEN_IMAGE=ghcr.io/fahed-alhammadi/subgen:0.5</code> in <code>.env</code>.</p>
+          <p><strong>Updating.</strong> Back up <code>/config</code>, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version with <code>SUBGEN_IMAGE=ghcr.io/fahed-alhammadi/subgen:0.6</code> in <code>.env</code>.</p>
           <p><strong>Remote access.</strong> Keep the default localhost bind and put SubGen behind an HTTPS reverse proxy. Mount extra libraries as separate paths below <code>/media</code>.</p>
         </div>
       </div>
@@ -485,7 +486,7 @@ SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
           <details>
             <summary>What does the license allow?</summary>
             <div class="answer">
-              <p>SubGen is source-available under the <a href="https://github.com/Fahed-Alhammadi/SubGen/blob/main/LICENSE">Elastic License 2.0</a>. You can use, modify and redistribute it, including running it for yourself or your organisation. You cannot offer it to third parties as a hosted or managed service, and you must keep the license and copyright notices.</p>
+              <p>SubGen is open source under the <a href="https://github.com/Fahed-Alhammadi/SubGen/blob/main/LICENSE">MIT License</a>. You can use, modify, redistribute and even sell it, for yourself, your organisation or as a service, as long as you keep the copyright and license notice. It comes without warranty.</p>
             </div>
           </details>
           <details>
@@ -529,7 +530,7 @@ SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
           <li><a href="privacy.html">Privacy</a></li>
         </ul>
       </div>
-      <p class="legal">© 2026 Fahed Alhammadi. SubGen is licensed under the Elastic License 2.0.</p>
+      <p class="legal">© 2026 Fahed Alhammadi. SubGen is released under the MIT License.</p>
     </div>
   </footer>
 </body>

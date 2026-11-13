@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from sqlalchemy import select
@@ -131,6 +132,22 @@ def run_job(ctx: JobContext, engine: Engine) -> None:
         logger.exception("Subtitle job %s failed", ctx.job_id)
         _finish(ctx.job_id, JobStatus.FAILED, error=str(exc) or type(exc).__name__)
         set_state(state="error", job_id=None, message=str(exc)[:500])
+    finally:
+        engine.last_used = monotonic()
+
+
+def unload_if_idle(engine: Engine) -> bool:
+    """Drop loaded models once no job has run for ``model_idle_minutes`` (0 = never)."""
+    if not engine.loaded():
+        return False
+    with SessionLocal() as db:
+        minutes = int(all_values(db)["model_idle_minutes"])
+    if not minutes or monotonic() - engine.last_used < minutes * 60:
+        return False
+    engine.unload()
+    logger.info("Unloaded models after %d idle minutes", minutes)
+    set_state(model=None)
+    return True
 
 
 def selected_models(values: dict[str, Any]) -> dict[str, str | None]:
@@ -166,6 +183,10 @@ def worker_loop(stop: threading.Event) -> None:
         if context is None:
             if worker_state["state"] == "processing":
                 set_state(state="idle", job_id=None)
+            try:
+                unload_if_idle(engine)
+            except Exception:
+                logger.exception("Could not unload idle models")
             stop.wait(get_settings().worker_poll_seconds)
             continue
         run_job(context, engine)

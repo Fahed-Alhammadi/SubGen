@@ -109,7 +109,19 @@ export function qs(params) {
  */
 export function uploadFile(file, onProgress) {
   const xhr = new XMLHttpRequest();
-  const promise = new Promise((resolve, reject) => {
+  let aborted = false;
+  const cancelled = () => {
+    const err = new Error('Upload cancelled');
+    err.name = 'AbortError';
+    return err;
+  };
+  // Ask first (size limit, free disk space): a refusal sent mid-upload often reaches the browser
+  // as a dropped connection instead of a readable message.
+  const promise = request('GET', `/api/uploads/space${qs({ size: file.size })}`).then(() => {
+    if (aborted) throw cancelled();
+    return send();
+  });
+  const send = () => new Promise((resolve, reject) => {
     xhr.open('POST', `/api/uploads${qs({ filename: file.name })}`);
     xhr.setRequestHeader('x-csrf-token', readCookie('subgen_csrf'));
     xhr.setRequestHeader('content-type', 'application/octet-stream');
@@ -137,14 +149,16 @@ export function uploadFile(file, onProgress) {
       }
     };
     xhr.onerror = () => reject(new ApiError('The upload was interrupted. Check the connection and try again.', 0, null));
-    xhr.onabort = () => {
-      const err = new Error('Upload cancelled');
-      err.name = 'AbortError';
-      reject(err);
-    };
+    xhr.onabort = () => reject(cancelled());
     xhr.send(file);
   });
-  return { promise, abort: () => xhr.abort() };
+  return {
+    promise,
+    abort: () => {
+      aborted = true;
+      xhr.abort();
+    },
+  };
 }
 
 /** POST/GET a file endpoint and save the response as a download. */

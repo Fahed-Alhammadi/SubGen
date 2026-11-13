@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     stable_file_seconds: int = 60
     worker_poll_seconds: int = 3
     max_upload_mb: int = 20480
+    min_free_mb: int = 1024  # uploads and model downloads never leave less than this free
     max_media_hours: float = 12.0
     whisper_device: str = "auto"
     whisper_compute_type: str = "auto"

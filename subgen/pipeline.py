@@ -4,6 +4,7 @@ import gc
 import hashlib
 import json
 import logging
+import sys
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -107,8 +108,21 @@ def resolve_device() -> tuple[str, str]:
     return device, compute
 
 
+def release_gpu_cache() -> None:
+    """Hand memory PyTorch cached for freed tensors back to the GPU (no-op without CUDA or torch)."""
+    torch = sys.modules.get("torch")  # never import torch just for this
+    try:
+        if torch is not None and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # a broken CUDA setup must not stop the worker
+        logger.debug("Could not empty the CUDA cache", exc_info=True)
+
+
 class Engine:
-    """Keeps models loaded between jobs and reloads them only when their settings change."""
+    """Keeps models loaded between jobs and reloads them only when their settings change.
+
+    Models are dropped after ``model_idle_minutes`` without a job (see ``worker.unload_if_idle``).
+    """
 
     def __init__(self) -> None:
         self.whisper = None
@@ -117,6 +131,17 @@ class Engine:
         self.translator: Translator | None = None
         self.translator_key: tuple | None = None
         self.device, self.compute = resolve_device()
+        self.last_used = monotonic()
+
+    def loaded(self) -> bool:
+        return self.whisper is not None or self.translator is not None
+
+    def unload(self) -> None:
+        """Release both models; CTranslate2 frees its memory when the model object is deleted."""
+        self.whisper = self.batched = self.translator = None
+        self.whisper_key = self.translator_key = None
+        gc.collect()
+        release_gpu_cache()
 
     def load_whisper(self, values: dict[str, Any]):
         from faster_whisper import BatchedInferencePipeline, WhisperModel
@@ -157,6 +182,7 @@ class Engine:
             return self.translator
         self.translator = None
         gc.collect()
+        release_gpu_cache()
         location = translation_model_dir(values["translation_model"])
         if not (location / "config.json").is_file():
             raise FileNotFoundError(

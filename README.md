@@ -8,7 +8,7 @@
   <a href="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml"><img src="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/ci.yaml/badge.svg" alt="CI status"></a>
   <a href="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml"><img src="https://github.com/Fahed-Alhammadi/SubGen/actions/workflows/container.yaml/badge.svg" alt="Container build status"></a>
   <a href="https://github.com/Fahed-Alhammadi/SubGen/pkgs/container/subgen"><img src="https://img.shields.io/badge/GHCR-subgen-blue?logo=docker" alt="GitHub Container Registry"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Elastic--2.0-blue.svg" alt="Elastic License 2.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
 </p>
 
 <p><a href="https://fahed-alhammadi.github.io/SubGen/">Website</a> · <a href="#quick-start">Quick start</a> · <a href="docs/API.md">API reference</a></p>
@@ -93,7 +93,7 @@ media file ─► ffprobe ─► choose audio track ─► ffmpeg (16 kHz mono)
 Browser ──HTTPS──► reverse proxy ──► SubGen container
                                       ├─ Web UI + JSON API (FastAPI)
                                       ├─ Scheduler (library scans, upload expiry)
-                                      ├─ Worker (one job at a time, models kept loaded)
+                                      ├─ Worker (one job at a time; models unloaded when idle)
                                       └─ SQLite (jobs, settings, transcripts, audit)
                                              │
                           /media (libraries)  /models  /config
@@ -170,6 +170,11 @@ The models in use are installed automatically when they are missing (on first st
 NLLB-200 600M); the queue waits while they download. Any model that is not in use, including the
 defaults, can be deleted. Set `SUBGEN_AUTO_INSTALL_MODELS=false` on servers without internet access and
 copy models into the folders above instead.
+
+Jobs run one at a time, in priority order, so a long queue never runs several models at once. Loaded
+models stay in memory between jobs and are released after 15 idle minutes (**Settings → Transcription →
+Unload models when idle**; 0 keeps them loaded), which frees GPU memory for other containers. The next job
+reloads them in a few seconds.
 
 ## Settings
 
@@ -251,6 +256,7 @@ See [.env.example](.env.example) for the full template.
 | `SUBGEN_WHISPER_COMPUTE_TYPE` | `auto` (float16 on GPU, int8 on CPU) or any CTranslate2 type |
 | `SUBGEN_AUTO_INSTALL_MODELS` | Install the selected models when missing (default `true`; set `false` offline) |
 | `SUBGEN_MAX_UPLOAD_MB` | Studio upload limit (default 20480) |
+| `SUBGEN_MIN_FREE_MB` | Disk space uploads and model downloads always leave free (default 1024) |
 | `SUBGEN_WORKSPACE_DIR` | Studio upload storage (default `/config/workspace`) |
 | `SUBGEN_STABLE_FILE_SECONDS` | Wait before processing recently modified files |
 | `SUBGEN_BIND_ADDRESS`, `SUBGEN_PORT` | Published address and port |
@@ -331,10 +337,10 @@ tested, and never include credentials, media or model files.
 
 ## License
 
-SubGen is licensed under the [Elastic License 2.0](LICENSE) (`Elastic-2.0`). You may use, copy,
-modify and redistribute the software subject to its terms. You may not offer SubGen to third parties as
-a hosted or managed service that exposes a substantial set of its functionality, and you must preserve
-its license and copyright notices.
+SubGen is released under the [MIT License](LICENSE). You may use, copy, modify, merge, publish,
+distribute, sublicense and sell copies of the software, provided the copyright and permission notice is
+included in all copies or substantial portions of it. The software is provided "as is", without warranty
+of any kind.
 
 ---
 

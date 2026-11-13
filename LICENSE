@@ -1,21 +1,21 @@
-Elastic License 2.0 (ELv2)
+MIT License
 
-SPDX-License-Identifier: Elastic-2.0
+Copyright (c) 2026 Fahed Alhammadi
 
-Copyright (c) 2026 Fahed Alhammadi. All rights reserved.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-SubGen is licensed under the Elastic License 2.0. The complete, authoritative
-license terms are available at:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-https://www.elastic.co/licensing/elastic-license
-
-The Elastic License 2.0 permits use, copying, distribution, making available,
-and preparation of derivative works, subject to its conditions and limitations.
-Among other limitations, you may not provide the software to third parties as a
-hosted or managed service that gives access to a substantial set of its features,
-and you may not remove or obscure licensing, copyright, or other notices.
-
-The official Elastic License 2.0 terms linked above are incorporated into this
-notice by reference. If this summary conflicts with those terms, the official
-Elastic License 2.0 terms control.
-
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -46,6 +46,10 @@ def _schema() -> list[Field]:
         Field("transcription_model", "transcription", "Whisper model", "model", DEFAULT_WHISPER_MODEL,
               "Installed faster-whisper (CTranslate2) model used for speech recognition. Larger models "
               "are more accurate but slower.", model_kind="whisper", max_length=200),
+        Field("model_idle_minutes", "transcription", "Unload models when idle (minutes)", "int", 15,
+              "Free the GPU memory and RAM held by the Whisper and local translation models when no job has "
+              "run for this long. The next job loads them again, which takes a few seconds. 0 keeps them "
+              "loaded.", min=0, max=1440, step=1),
         Field("source_language", "transcription", "Spoken language", "language", "auto",
               "Force the spoken language when automatic detection picks the wrong one. Individual jobs can "
               "override this.", options=_language_options(True)),

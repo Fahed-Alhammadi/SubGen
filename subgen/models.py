@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .config import get_settings
+from .storage import require_space
 
 logger = logging.getLogger(__name__)
 REPO_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -160,6 +161,8 @@ def _download(item: Download) -> None:
         if target.exists():
             raise FileExistsError(f"Model is already installed: {item.repo_id}")
         ignored, total = _plan(item.repo_id)
+        # Fails before anything is written; with an unknown size, at least the reserve must be free.
+        require_space(get_settings().model_dir, total or 0, f"downloading {item.repo_id}")
         item.total_bytes, item.status = total, "downloading"
         staging.mkdir(parents=True, exist_ok=True)
         threading.Thread(target=monitor, daemon=True).start()

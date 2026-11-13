@@ -1,4 +1,4 @@
-# SubGen HTTP API (v0.5)
+# SubGen HTTP API (v0.6)
 
 All endpoints are same-origin JSON unless noted. The web UI is the only intended client.
 
@@ -12,6 +12,7 @@ All endpoints are same-origin JSON unless noted. The web UI is the only intended
   out, they redirect to `/login?next=<path>`.
 - **401** → session missing/expired; the UI redirects to `/login`. Unauthenticated `/api/*` requests are
   rejected before their body is read.
+- **507** → not enough disk space (uploads and model downloads keep `SUBGEN_MIN_FREE_MB` free).
 - **413** → request body too large: 1 MB for JSON endpoints, 64 MB for subtitle saves, `SUBGEN_MAX_UPLOAD_MB`
   for uploads, 2 GB for restores.
 - **Errors** always return `{"detail": "<human readable string>"}` (validation errors are flattened to a string).
@@ -168,7 +169,8 @@ and returns their ids. Existing sidecars are overwritten when the job completes.
 
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
-| POST | `/api/uploads?filename=<name>` | raw file bytes (`application/octet-stream`) | `MediaItem` |
+| GET | `/api/uploads/space?size=<bytes>` | – | `{ok}`; 413 over the upload limit, 507 when it would leave less than `SUBGEN_MIN_FREE_MB` free. The UI calls this before uploading |
+| POST | `/api/uploads?filename=<name>` | raw file bytes (`application/octet-stream`) | `MediaItem`; 507 when the disk would run low (checked before and every 256 MB during the upload) |
 | GET | `/api/uploads` | – | `[MediaItem & {jobs: [Job], expires_at}]` newest first |
 | DELETE | `/api/uploads/{media_id}` | – | `{ok}` (deletes upload, its subtitles and jobs) |
 
@@ -258,7 +260,7 @@ keys (so secrets need not be resent).
 
 `GET /api/system` →
 ```json
-{"version": "0.5.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
+{"version": "0.6.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
  "device_mode": "auto", "compute_type": "auto",
  "gpus": [{"name": "NVIDIA RTX 4090", "memory_total": 25757220864, "memory_used": 1200000000}],
  "disks": [{"label": "Models", "path": "/models", "total": 0, "free": 0},

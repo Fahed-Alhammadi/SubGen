@@ -1,3 +1,4 @@
+import errno
 import json
 import mimetypes
 import re
@@ -21,8 +22,10 @@ from ..media import delete_upload, library_root, load_probe, store_probe, worksp
 from ..paths import UPLOAD_EXTENSIONS, confined_path
 from ..security import require_auth
 from ..settings_store import all_values
+from ..storage import NotEnoughSpace, require_space
 from .common import audit, job_dict, like_escape, media_dict, page, validate_targets
 
+SPACE_CHECK_BYTES = 256 * 1024 * 1024
 router = APIRouter(dependencies=[Depends(require_auth)])
 _UNSAFE = re.compile(r'[\x00-\x1f\x7f<>:"/\\|?*]')
 
@@ -155,6 +158,20 @@ def _safe_name(raw: str) -> str:
     return f"{stem}{suffix}"
 
 
+@router.get("/api/uploads/space")
+def upload_space(size: int):
+    """Pre-flight for the browser: a refusal sent mid-upload often surfaces as a dropped connection."""
+    if size < 0:
+        raise HTTPException(422, "size must not be negative")
+    if size > get_settings().max_upload_mb * 1024 * 1024:
+        raise HTTPException(413, f"File is larger than the {get_settings().max_upload_mb} MB upload limit")
+    try:
+        require_space(get_settings().workspace, size, "this upload")
+    except NotEnoughSpace as exc:
+        raise HTTPException(507, str(exc)) from exc
+    return {"ok": True}
+
+
 @router.post("/api/uploads")
 async def upload(request: Request, filename: str):
     name = _safe_name(filename)
@@ -163,17 +180,33 @@ async def upload(request: Request, filename: str):
     if declared and declared.isdigit() and int(declared) > limit:
         raise HTTPException(413, f"File is larger than the {get_settings().max_upload_mb} MB upload limit")
     root = get_settings().workspace
+    try:
+        require_space(root, int(declared) if declared and declared.isdigit() else 0, "this upload")
+    except NotEnoughSpace as exc:
+        raise HTTPException(507, str(exc)) from exc
     folder = root / uuid.uuid4().hex
     folder.mkdir(parents=True, exist_ok=True)
     destination = folder / name
-    size = 0
+    size = checked = 0
     try:
         with destination.open("wb") as output:
             async for chunk in request.stream():
                 size += len(chunk)
                 if size > limit:
                     raise HTTPException(413, f"File is larger than the {get_settings().max_upload_mb} MB upload limit")
-                await run_in_threadpool(output.write, chunk)
+                if size - checked >= SPACE_CHECK_BYTES:
+                    # Re-check while streaming: the size may be unknown, or other writes may fill the disk.
+                    checked = size
+                    try:
+                        await run_in_threadpool(require_space, root, 0, "this upload")
+                    except NotEnoughSpace as exc:
+                        raise HTTPException(507, str(exc)) from exc
+                try:
+                    await run_in_threadpool(output.write, chunk)
+                except OSError as exc:
+                    if exc.errno == errno.ENOSPC:
+                        raise HTTPException(507, "The disk is full. Free up space and try again.") from exc
+                    raise
         if size == 0:
             raise HTTPException(422, "The uploaded file is empty")
     except BaseException:
