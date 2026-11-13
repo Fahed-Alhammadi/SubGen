@@ -1,22 +1,64 @@
 /* SubGen design tokens.
-   Identity: true-neutral greys (no hue cast, so video previews and subtitle text are judged
-   against grey, as in an edit suite) with one signal blue reserved for primary actions,
-   selection, focus, progress and the playhead. Status colours are kept distinct from it. */
+   Identity: true-neutral greys (no hue cast, so video and subtitle text are judged against grey,
+   as in an edit suite) with one signal blue reserved for primary actions, selection, focus,
+   progress and the playhead. Status colours stay distinct from it and mark problems first.
+
+   Type: Atkinson Hyperlegible Next, drawn by the Braille Institute for low-vision readers (the
+   same job subtitles do), with its Mono sibling for timecodes and file paths. Both are bundled
+   (SIL OFL 1.1, see /static/fonts) so the interface works offline. */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/static/fonts/atkinson-next-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/static/fonts/atkinson-next-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/static/fonts/atkinson-mono-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible Mono";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("/static/fonts/atkinson-mono-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
 
 :root {
-  --font-ui: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI",
-    system-ui, Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono", "Roboto Mono", Menlo, Consolas,
+  --font-ui: "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Noto Sans", "Noto Sans Arabic", "Geeza Pro", Arial, sans-serif;
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
 
-  /* Type scale (px based on 14px UI body) */
-  --fs-xs: 0.75rem;   /* 12 */
-  --fs-sm: 0.8125rem; /* 13 */
-  --fs-md: 0.875rem;  /* 14 */
-  --fs-lg: 1rem;      /* 16 */
-  --fs-xl: 1.25rem;   /* 20 */
-  --fs-2xl: 1.5rem;   /* 24 */
-  --fs-3xl: 2rem;     /* 32 */
+  /* Type scale, 14px body: 12 13 14 16 18 21 28 36 */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.875rem;
+  --fs-lg: 1rem;
+  --fs-xl: 1.125rem;
+  --fs-2xl: 1.3125rem;
+  --fs-3xl: 1.75rem;
+  --fs-4xl: 2.25rem;
 
   /* Spacing (4px grid) */
   --s-1: 0.25rem;
@@ -29,34 +71,39 @@
   --s-10: 2.5rem;
   --s-12: 3rem;
 
-  /* Radii: controls < panels < dialogs */
+  /* Radii follow hierarchy: tags < controls < surfaces < dialogs */
   --r-1: 4px;
-  --r-2: 6px;
-  --r-3: 8px;
-  --r-4: 12px;
+  --r-2: 7px;
+  --r-3: 10px;
+  --r-4: 14px;
 
-  --sidebar-w: 216px;
-  --control-h: 2rem;
+  --rail-w: 232px;
+  --page-max: 1240px;
+  --control-h: 2.125rem;
+  --control-h-sm: 1.75rem;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --dur: 160ms;
+  --dur: 150ms;
 
   color-scheme: light;
   /* Light theme */
-  --bg: #f7f7f8;
+  --bg: #f4f4f5;
+  --rail: #fbfbfc;
   --panel: #ffffff;
-  --raised: #fafafb;
-  --sunken: #efeff1;
-  --line: #e2e2e6;
+  --raised: #f7f7f8;
+  --sunken: #ebebee;
+  --hover: #f1f1f3;
+  --field: #ffffff;
+  --line: #e3e3e7;
   --line-strong: #c9c9d0;
   --text: #18181b;
-  --text-2: #3f3f46;
-  --muted: #62626a;
-  --faint: #8d8d95;
+  --text-2: #3b3b42;
+  --muted: #5f5f68;
+  --faint: #6e6e77;
 
   --brand: #2563eb;
   --signal: #2563eb;         /* text-safe on white (5.2:1) */
-  --signal-fill: #3b82f6;    /* progress / playhead fill */
-  --signal-soft: #eaf1fe;
+  --signal-fill: #3b82f6;    /* progress, playhead, switches */
+  --signal-soft: #e8f0fe;
   --primary-bg: #2563eb;
   --primary-fg: #ffffff;
   --primary-hover: #1d4fd8;
@@ -70,34 +117,39 @@
   --warn-soft: #fcf1dc;
   --danger: #c42525;
   --danger-soft: #fdeaea;
-  --neutral: #62626a;
-  --neutral-soft: #efeff1;
+  --neutral: #5f5f68;
+  --neutral-soft: #ebebee;
 
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.05);
-  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
-  --backdrop: rgb(10 10 12 / 0.4);
-  --tick: rgb(24 24 27 / 0.1);
+  --monitor: #000000;        /* video black behind the live timeline */
+
+  --shadow-pop: 0 16px 48px rgb(0 0 0 / 0.16), 0 2px 6px rgb(0 0 0 / 0.06);
+  --backdrop: rgb(10 10 12 / 0.45);
+  --tick: rgb(24 24 27 / 0.14);
+  --tick-major: rgb(24 24 27 / 0.32);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #161617;
-    --panel: #1e1e20;
-    --raised: #242427;
-    --sunken: #111112;
-    --line: #2f2f33;
-    --line-strong: #45454b;
-    --text: #ededee;
-    --text-2: #c9c9cd;
-    --muted: #9b9ba3;
-    --faint: #6d6d75;
+    --bg: #141416;
+    --rail: #101012;
+    --panel: #1b1b1e;
+    --raised: #222226;
+    --sunken: #0f0f11;
+    --hover: #212125;
+    --field: #131315;
+    --line: #2a2a2f;
+    --line-strong: #3d3d44;
+    --text: #ededef;
+    --text-2: #c6c6cc;
+    --muted: #a0a0a8;
+    --faint: #8a8a93;
 
     --brand: #2f6be8;
-    --signal: #6ea2ff;         /* text-safe on panel */
+    --signal: #6ea2ff;
     --signal-fill: #4c8dff;
-    --signal-soft: #18233a;
-    --primary-bg: #2f6be8;     /* white label 4.6:1 */
+    --signal-soft: #17223a;
+    --primary-bg: #2f6be8;   /* white label 4.6:1 */
     --primary-fg: #ffffff;
     --primary-hover: #2860d6;
     --focus: #6ea2ff;
@@ -110,34 +162,36 @@
     --warn-soft: #33270f;
     --danger: #f2726d;
     --danger-soft: #3a1818;
-    --neutral: #a1a1a9;
-    --neutral-soft: #29292d;
-
-    --shadow-1: 0 1px 0 rgb(0 0 0 / 0.35);
-    --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.4);
-    --backdrop: rgb(0 0 0 / 0.6);
-    --tick: rgb(237 237 238 / 0.09);
+    --neutral: #a0a0a8;
+    --neutral-soft: #26262a;
+    --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+    --backdrop: rgb(0 0 0 / 0.62);
+    --tick: rgb(237 237 239 / 0.12);
+    --tick-major: rgb(237 237 239 / 0.3);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #161617;
-  --panel: #1e1e20;
-  --raised: #242427;
-  --sunken: #111112;
-  --line: #2f2f33;
-  --line-strong: #45454b;
-  --text: #ededee;
-  --text-2: #c9c9cd;
-  --muted: #9b9ba3;
-  --faint: #6d6d75;
+  --bg: #141416;
+  --rail: #101012;
+  --panel: #1b1b1e;
+  --raised: #222226;
+  --sunken: #0f0f11;
+  --hover: #212125;
+  --field: #131315;
+  --line: #2a2a2f;
+  --line-strong: #3d3d44;
+  --text: #ededef;
+  --text-2: #c6c6cc;
+  --muted: #a0a0a8;
+  --faint: #8a8a93;
 
   --brand: #2f6be8;
-  --signal: #6ea2ff;         /* text-safe on panel */
+  --signal: #6ea2ff;
   --signal-fill: #4c8dff;
-  --signal-soft: #18233a;
-  --primary-bg: #2f6be8;     /* white label 4.6:1 */
+  --signal-soft: #17223a;
+  --primary-bg: #2f6be8;
   --primary-fg: #ffffff;
   --primary-hover: #2860d6;
   --focus: #6ea2ff;
@@ -150,11 +204,10 @@
   --warn-soft: #33270f;
   --danger: #f2726d;
   --danger-soft: #3a1818;
-  --neutral: #a1a1a9;
-  --neutral-soft: #29292d;
-
-  --shadow-1: 0 1px 0 rgb(0 0 0 / 0.35);
-  --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.4);
-  --backdrop: rgb(0 0 0 / 0.6);
-  --tick: rgb(237 237 238 / 0.09);
+  --neutral: #a0a0a8;
+  --neutral-soft: #26262a;
+  --shadow-pop: 0 18px 60px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.4);
+  --backdrop: rgb(0 0 0 / 0.62);
+  --tick: rgb(237 237 239 / 0.12);
+  --tick-major: rgb(237 237 239 / 0.3);
 }

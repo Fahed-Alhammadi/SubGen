@@ -5,7 +5,7 @@ import { icon } from '../ui/icons.js';
 import { createPoller } from '../ui/poller.js';
 import { notify } from '../ui/toast.js';
 import { confirmDialog } from '../ui/dialog.js';
-import { pageHeader, statusBadge, track, jobProgressText, jobTiming, emptyState, errorState, skeletonRows } from '../ui/components.js';
+import { pageHeader, statusBadge, track, jobProgressText, jobTiming, langLabel, stageProgress, emptyState, errorState, skeletonRows } from '../ui/components.js';
 import { bytes, clock, relative, dateTime, isAudio, fileExt, AUDIO_EXTS, VIDEO_EXTS } from '../ui/format.js';
 import { getLanguages } from '../store.js';
 import { buildGenerateForm, submitGenerate, openGenerateDialog } from './generate.js';
@@ -21,20 +21,19 @@ export async function mount(ctx) {
     html`
       ${pageHeader({
         title: 'Studio',
-        subtitle: 'Subtitle a single file without adding it to a library. Uploads are removed automatically after the retention period.',
+        subtitle: 'Subtitle a single file without adding it to a library. Uploads are deleted automatically after the retention period set in Settings.',
       })}
-      <div class="studio stack">
-        <section class="panel" aria-labelledby="studio-up-h">
-          <div class="panel-head"><h2 id="studio-up-h">New upload</h2></div>
-          <div class="panel-body" data-slot="stage"></div>
+      <div class="studio">
+        <section class="studio-stage" aria-labelledby="studio-up-h">
+          <div class="section-head"><h2 id="studio-up-h">New upload</h2></div>
+          <div data-slot="stage"></div>
         </section>
-        <section class="panel" aria-labelledby="studio-list-h">
-          <div class="panel-head">
+        <section class="studio-uploads" aria-labelledby="studio-list-h">
+          <div class="section-head">
             <h2 id="studio-list-h">Uploads</h2>
-            <span class="spacer"></span>
-            <span class="meta" data-slot="count"></span>
+            <span class="count" data-slot="count"></span>
           </div>
-          <ul class="upload-list" data-slot="uploads">${skeletonRows(3, 'block')}</ul>
+          <ul class="list panel upload-list" data-slot="uploads">${skeletonRows(3, 'block')}</ul>
         </section>
       </div>`,
   );
@@ -56,7 +55,7 @@ export async function mount(ctx) {
       html`<label class="dropzone" data-dropzone>
         ${icon('upload')}
         <strong>Drop a video or audio file here</strong>
-        <span>or <span class="link-like">choose a file</span> from this computer</span>
+        <span>or <span class="link-like">choose a file</span> from this computer, up to the server's upload limit</span>
         <span class="faint small">MKV, MP4, MOV, WebM, AVI, MP3, M4A, WAV, FLAC and more</span>
         <input type="file" accept="${ACCEPT}" data-file aria-label="Choose a media file to upload">
       </label>`,
@@ -92,7 +91,7 @@ export async function mount(ctx) {
     }
     render(
       stage,
-      html`<div class="upload-progress stack-sm" aria-live="polite">
+      html`<div class="panel upload-progress" aria-live="polite">
         <div class="row">
           ${icon(isAudio(file.name) ? 'music' : 'film')}
           <strong class="truncate upload-name"></strong>
@@ -144,12 +143,13 @@ export async function mount(ctx) {
     }
     const form = buildGenerateForm({ media, probe: undefined, languages, defaults: { languages: [], formats: ['srt'] } });
     pendingForm = form;
-    const wrap = element(html`<form class="stack" novalidate>
-        <div class="row">
-          ${icon(isAudio(media.name) ? 'music' : 'film')}
-          <strong class="truncate media-name"></strong>
-          ${media.duration_ms ? html`<span class="muted num">${clock(media.duration_ms)}</span>` : ''}
-          <span class="muted num">${bytes(media.size)}</span>
+    const wrap = element(html`<form class="panel studio-form" novalidate>
+        <div class="studio-file">
+          <span class="file-icon">${icon(isAudio(media.name) ? 'music' : 'film')}</span>
+          <div class="min0">
+            <strong class="cell-title truncate media-name"></strong>
+            <span class="cell-sub num">${media.duration_ms ? `${clock(media.duration_ms)}, ` : ''}${bytes(media.size)}</span>
+          </div>
         </div>
         <div class="form-slot"></div>
         <div class="row">
@@ -217,7 +217,7 @@ export async function mount(ctx) {
   function paintUploads() {
     count.textContent = uploads.length ? `${uploads.length} file${uploads.length === 1 ? '' : 's'}` : '';
     if (!uploads.length) {
-      render(list, html`<li>${emptyState({ iconName: 'upload', compact: true, title: 'No uploads', text: 'Files you upload above appear here with their subtitle jobs.' })}</li>`);
+      render(list, html`<li>${emptyState({ iconName: 'upload', compact: true, title: 'No uploads yet', text: 'Files you upload appear here with their subtitle jobs.' })}</li>`);
       return;
     }
     patchList(list, uploads, (u) => u.id, uploadCard);
@@ -292,12 +292,11 @@ function uploadCard(upload) {
     ${jobs.length
       ? html`<ul class="upload-jobs">${jobs.map(
           (job) => html`<li class="upload-job" data-status="${job.status}">
-            <span class="badge plain" data-tone="outline" title="${job.language_name || job.language}">${String(job.language).toUpperCase()}</span>
-            <span class="badge plain" data-tone="outline">${String(job.format).toUpperCase()}</span>
+            <span class="upload-job-tags">${langLabel(job)}</span>
             ${statusBadge(job.status)}
             <div class="upload-job-progress">
               ${job.status === 'processing'
-                ? html`${track(job.progress, { label: `Progress ${job.language} ${job.format}`, thin: true })}<span class="small muted num">${jobProgressText(job)} ${Math.round(job.progress || 0)}%${jobTiming(job).length ? html`, ${jobTiming(job).join(', ')}` : ''}</span>`
+                ? html`${track(stageProgress(job), { label: `Progress ${job.language} ${job.format}`, thin: true })}<span class="small muted num">${jobProgressText(job)} ${Math.round(stageProgress(job))}%${jobTiming(job).length ? html`, ${jobTiming(job).join(', ')}` : ''}</span>`
                 : job.status === 'failed'
                   ? html`<span class="small tone-danger truncate" title="${job.error || ''}">${job.error || 'Failed'}</span>`
                   : job.status === 'completed'

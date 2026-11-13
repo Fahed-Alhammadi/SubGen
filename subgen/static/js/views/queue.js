@@ -5,10 +5,10 @@ import { icon } from '../ui/icons.js';
 import { createPoller } from '../ui/poller.js';
 import { notify } from '../ui/toast.js';
 import { openDialog, confirmDialog } from '../ui/dialog.js';
-import { pageHeader, statusBadge, track, jobProgressText, jobTiming, emptyState, errorState, skeletonRows, pager } from '../ui/components.js';
-import { relative, dateTime, elapsed, duration, clock, speed, number, plural, STAGE_LABELS } from '../ui/format.js';
+import { pageHeader, statusBadge, track, jobTiming, langLabel, stageProgress, emptyState, errorState, skeletonRows, pager } from '../ui/components.js';
+import { relative, dateTime, elapsed, clock, speed, number, plural, STAGE_LABELS } from '../ui/format.js';
 import { onWorker, workerState } from '../store.js';
-import { jobActionButtons, jobHandlers } from './job-actions.js';
+import { jobActionButtons, jobHandlers, setPriority } from './job-actions.js';
 
 const LIMIT = 50;
 const TABS = [
@@ -45,8 +45,8 @@ export async function mount(ctx) {
     root,
     html`${pageHeader({
       title: 'Queue',
-      subtitle: 'Every subtitle job, in progress and finished.',
-      actions: html`<button type="button" class="btn" data-action="clear-completed">${icon('history')}Clear completed history</button>`,
+      subtitle: 'Every subtitle job, waiting, running and finished. Jobs run one at a time, highest priority first.',
+      actions: html`<button type="button" class="btn" data-action="clear-completed">${icon('history')}Clear completed jobs</button>`,
     })}
     <section class="panel queue-panel" aria-label="Jobs">
       <div class="tabs queue-tabs" role="group" aria-label="Filter by status">
@@ -160,11 +160,9 @@ export async function mount(ctx) {
         html`<div class="table-wrap"><table class="table queue-table">
           <thead><tr>
             <th class="col-check" scope="col"><input type="checkbox" data-select-all aria-label="Select all jobs on this page"></th>
-            <th scope="col">Media</th>
-            <th scope="col">Target</th>
-            <th scope="col">Status</th>
-            <th scope="col" class="col-progress">Progress</th>
-            <th scope="col">Priority</th>
+            <th scope="col">File</th>
+            <th scope="col">Subtitle</th>
+            <th scope="col" class="col-status">Status</th>
             <th scope="col">Updated</th>
             <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
           </tr></thead>
@@ -338,7 +336,7 @@ export async function mount(ctx) {
     }
     const body = element(html`<div class="stack job-detail">
       <div class="row">${statusBadge(job.status)}<span class="muted">${job.status === 'processing' ? STAGE_LABELS[job.stage] || job.stage : ''}</span></div>
-      ${job.status === 'processing' ? html`<div class="stack-sm">${track(job.progress, { label: 'Progress' })}<span class="small muted num">${Math.round(job.progress || 0)}%, ${jobTiming(job).join(', ')}</span></div>` : ''}
+      ${job.status === 'processing' ? html`<div class="stack-sm">${track(stageProgress(job), { label: 'Progress' })}<span class="small muted num">${Math.round(stageProgress(job))}%, ${jobTiming(job).join(', ')}</span></div>` : ''}
       ${job.error ? html`<div class="stack-sm"><h3>Error</h3><pre class="error-text">${job.error}</pre></div>` : ''}
       <dl class="dl">
         <dt>Media</dt><dd>${job.media_name}</dd>
@@ -346,7 +344,14 @@ export async function mount(ctx) {
         <dt>Source</dt><dd>${job.source === 'upload' ? 'Studio upload' : job.library_name || 'Library'}</dd>
         <dt>Language</dt><dd>${job.language_name || job.language} (${job.language})${job.detected_language ? html`<span class="muted">, spoken language detected as ${job.detected_language}</span>` : ''}</dd>
         <dt>Format</dt><dd>${String(job.format).toUpperCase()}</dd>
-        <dt>Priority</dt><dd>${job.priority}</dd>
+        <dt>Priority</dt><dd>${job.status === 'queued'
+          ? html`<span class="priority-editor">
+              <button type="button" class="btn btn-sm btn-icon" data-action="priority-down" data-id="${job.id}" aria-label="Lower priority" title="Lower priority">${icon('chevron-down')}</button>
+              <span class="num" data-priority-value aria-live="polite">${job.priority}</span>
+              <button type="button" class="btn btn-sm btn-icon" data-action="priority-up" data-id="${job.id}" aria-label="Raise priority" title="Raise priority">${icon('chevron-up')}</button>
+              <span class="small muted">Higher runs first</span>
+            </span>`
+          : job.priority}</dd>
         <dt>Media length</dt><dd>${job.duration_ms ? clock(job.duration_ms) : '—'}</dd>
         ${job.speed ? html`<dt>Speed</dt><dd>${speed(job.speed)}</dd>` : ''}
         <dt>Created</dt><dd>${dateTime(job.created_at)}</dd>
@@ -362,7 +367,7 @@ export async function mount(ctx) {
       title: `Job #${job.id}`,
       size: 'wide',
       body,
-      footer: html`<div class="btn-group left">${jobActionButtons(job, { compact: false, include: ['edit', 'download', 'retry', 'cancel', 'regenerate'] })}</div>
+      footer: html`<div class="btn-group left">${jobActionButtons(job, { compact: false, include: ['edit', 'download', 'retry', 'cancel', 'regenerate', 'delete', 'delete-subtitle'] })}</div>
         <button type="button" class="btn" data-dialog-close>Close</button>`,
     });
     const handlers = jobHandlers(
@@ -372,9 +377,25 @@ export async function mount(ctx) {
         poller.trigger();
       },
     );
-    dlg.el.addEventListener('click', (event) => {
+    dlg.el.addEventListener('click', async (event) => {
       const target = event.target.closest('[data-action]');
-      if (target && handlers[target.dataset.action]) handlers[target.dataset.action](target, event);
+      const action = target && target.dataset.action;
+      if (action === 'priority-up' || action === 'priority-down') {
+        // Adjust in place; the dialog stays open.
+        target.disabled = true;
+        try {
+          job.priority = await setPriority(job, (job.priority || 0) + (action === 'priority-up' ? 1 : -1));
+          const valueEl = dlg.el.querySelector('[data-priority-value]');
+          if (valueEl) valueEl.textContent = String(job.priority);
+          poller.trigger();
+        } catch (err) {
+          notify.error(err);
+        } finally {
+          target.disabled = false;
+        }
+        return;
+      }
+      if (target && handlers[action]) handlers[action](target, event);
       else if (event.target.closest('a[href^="/editor"]')) dlg.close();
     });
   }
@@ -393,35 +414,47 @@ export async function mount(ctx) {
 function jobRow(job, isSelected) {
   const timing = jobTiming(job);
   const when = job.finished_at || job.started_at || job.created_at;
-  const canPrioritize = job.status === 'queued';
   return html`<tr data-status="${job.status}" data-selected="${isSelected ? 'true' : 'false'}">
     <td class="col-check"><input type="checkbox" data-action="select" data-id="${job.id}" ${isSelected ? 'checked' : ''} aria-label="Select ${job.media_name} ${job.language} ${job.format}"></td>
     <td class="col-media">
       <button type="button" class="link-btn cell-title truncate" data-action="details" data-id="${job.id}" title="${job.media_path}">${job.media_name}</button>
-      <span class="cell-sub truncate">${job.source === 'upload' ? 'Studio upload' : job.library_name || ''}${job.status === 'failed' && job.error ? html` <span class="tone-danger">${job.error}</span>` : ''}</span>
+      <span class="cell-sub truncate">${job.source === 'upload' ? 'Studio upload' : job.library_name || ''}</span>
     </td>
-    <td class="nowrap"><span class="badge plain" data-tone="outline" title="${job.language_name || job.language}">${String(job.language).toUpperCase()}</span> <span class="badge plain" data-tone="outline">${String(job.format).toUpperCase()}</span></td>
-    <td class="nowrap">${statusBadge(job.status)}</td>
-    <td class="col-progress">
-      ${job.status === 'processing'
-        ? html`${track(job.progress, { label: `Progress for ${job.media_name}` })}<span class="cell-sub num">${jobProgressText(job)}, ${Math.round(job.progress || 0)}%${timing.length ? html`, ${timing.join(', ')}` : ''}</span>`
-        : html`<span class="cell-sub">${job.status === 'queued' ? 'Waiting' : job.duration_ms ? duration(job.duration_ms) : ''}</span>`}
-    </td>
-    <td class="nowrap">
-      <div class="priority">
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" data-action="priority-down" data-id="${job.id}" aria-label="Lower priority" title="Lower priority" ${canPrioritize ? '' : 'disabled'}>${icon('chevron-down')}</button>
-        <span class="num" aria-label="Priority ${job.priority}">${job.priority}</span>
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" data-action="priority-up" data-id="${job.id}" aria-label="Raise priority" title="Raise priority" ${canPrioritize ? '' : 'disabled'}>${icon('chevron-up')}</button>
-      </div>
-    </td>
-    <td class="nowrap small muted"><time datetime="${when || ''}" title="${dateTime(when)}">${relative(when)}</time></td>
+    <td class="col-target nowrap"><span class="tags">${langLabel(job)}</span></td>
+    <td class="col-status">${statusCell(job, timing)}</td>
+    <td class="col-when nowrap small muted"><time datetime="${when || ''}" title="${dateTime(when)}">${relative(when)}</time></td>
     <td class="col-actions">
       <div class="btn-group">
-        ${jobActionButtons(job)}
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" data-action="details" data-id="${job.id}" aria-label="Details for job ${job.id}" title="Details">${icon('info')}</button>
+        ${primaryAction(job)}
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" data-action="details" data-id="${job.id}" aria-label="Details and more actions for job ${job.id}" title="Details and more actions">${icon('more')}</button>
       </div>
     </td>
   </tr>`;
+}
+
+function statusCell(job, timing) {
+  if (job.status === 'processing') {
+    const step = stageProgress(job);
+    return html`<span class="badge" data-tone="processing">${icon('loader', { cls: 'spin' })}${STAGE_LABELS[job.stage] || 'Working'} ${Math.round(step)}%</span>
+      ${track(step, { label: `${STAGE_LABELS[job.stage] || 'Progress'} for ${job.media_name}`, thin: true })}
+      ${timing.length ? html`<span class="cell-sub num">${timing.join(', ')}</span>` : ''}`;
+  }
+  const sub =
+    job.status === 'failed' && job.error
+      ? html`<span class="cell-sub tone-danger truncate" title="${job.error}">${job.error}</span>`
+      : job.status === 'queued' && job.priority
+        ? html`<span class="cell-sub">Priority ${job.priority}</span>`
+        : job.status === 'completed' && job.duration_ms
+          ? html`<span class="cell-sub num">${clock(job.duration_ms)} of media</span>`
+          : '';
+  return html`${statusBadge(job.status)}${sub}`;
+}
+
+/** The one action a row offers directly; everything else lives in the details dialog. */
+function primaryAction(job) {
+  if (job.status === 'completed') return jobActionButtons(job, { compact: false, include: ['edit'] });
+  if (job.status === 'failed' || job.status === 'cancelled') return jobActionButtons(job, { compact: false, include: ['retry'] });
+  return jobActionButtons(job, { include: ['cancel'] });
 }
 
 function priorityDialog(count) {

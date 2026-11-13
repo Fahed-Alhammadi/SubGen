@@ -234,7 +234,8 @@ function paintStorage(el, s) {
         const used = Math.max(0, (d.total || 0) - (d.free || 0));
         const pct = d.total ? (used / d.total) * 100 : 0;
         return html`<li>
-          <div class="usage-head"><span>${icon('disk')}${d.label} <code class="small muted">${d.path}</code></span><span class="small muted num">${d.total ? `${bytes(d.free)} free of ${bytes(d.total)}` : 'Unknown'}</span></div>
+          <div class="usage-head"><span>${icon('disk')}${d.label}</span><span class="small muted num">${d.total ? `${bytes(d.free)} free of ${bytes(d.total)}` : 'Unknown'}</span></div>
+          <code class="usage-path">${d.path}</code>
           ${meter(pct, `${d.label} disk used`)}
         </li>`;
       })}</ul>

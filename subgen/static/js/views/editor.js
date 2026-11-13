@@ -99,8 +99,14 @@ function createEditor(ctx, doc, jobId) {
                 <p><strong>No preview for this file.</strong> The browser cannot play this container format. Timing tools still work.</p>
               </div>`}
 
-          <details class="tool" open>
-            <summary><h2 id="tool-shift-h">Shift timing</h2></summary>
+          <section class="panel tools" aria-label="Tools">
+          <div class="segmented tools-tabs" role="tablist" aria-label="Tools">
+            <button type="button" role="tab" id="tooltab-shift" aria-controls="tool-shift" aria-selected="true" data-tool="shift">Timing</button>
+            <button type="button" role="tab" id="tooltab-find" aria-controls="tool-find" aria-selected="false" tabindex="-1" data-tool="find">Find</button>
+            <button type="button" role="tab" id="tooltab-qc" aria-controls="tool-qc" aria-selected="false" tabindex="-1" data-tool="qc">Checks</button>
+          </div>
+          <div class="tool" id="tool-shift" role="tabpanel" aria-labelledby="tooltab-shift">
+            <p class="small muted">Move cues earlier or later, for example when the subtitle is out of sync.</p>
             <div class="row nowrap-row">
               <label class="sr-only" for="shift-ms">Shift by milliseconds</label>
               <input class="input num" id="shift-ms" type="number" step="100" value="500" data-shift>
@@ -111,10 +117,9 @@ function createEditor(ctx, doc, jobId) {
               <button type="button" class="btn btn-sm" data-act="shift" data-dir="1">Later${icon('chevron-right')}</button>
             </div>
             <p class="small muted" data-shift-scope>Applies to all cues.</p>
-          </details>
+          </div>
 
-          <details class="tool" open>
-            <summary><h2 id="tool-find-h">Find and replace</h2></summary>
+          <div class="tool" id="tool-find" role="tabpanel" aria-labelledby="tooltab-find" hidden>
             <input class="input" type="search" placeholder="Find" aria-label="Find text" data-find>
             <input class="input" type="text" placeholder="Replace with" aria-label="Replace with" data-replace>
             <label class="check small"><input type="checkbox" data-case>Match case</label>
@@ -123,14 +128,14 @@ function createEditor(ctx, doc, jobId) {
               <button type="button" class="btn btn-sm" data-act="replace-all">${icon('replace')}Replace all</button>
             </div>
             <p class="small muted num" data-find-count aria-live="polite"></p>
-          </details>
+          </div>
 
-          <details class="tool" open>
-            <summary><h2 id="tool-qc-h">Checks</h2></summary>
+          <div class="tool" id="tool-qc" role="tabpanel" aria-labelledby="tooltab-qc" hidden>
             <p class="small" data-qc-summary aria-live="polite"></p>
             <button type="button" class="btn btn-sm" data-act="next-issue">${icon('alert')}Next issue</button>
             <p class="small muted">Flags overlaps, cues under 0.7 s, reading speed over ${MAX_CPS} characters per second, lines over ${MAX_LINE} characters and more than ${MAX_LINES} lines.</p>
-          </details>
+          </div>
+          </section>
         </aside>
 
         <section class="editor-main panel" aria-label="Cues">
@@ -160,8 +165,27 @@ function createEditor(ctx, doc, jobId) {
   const replaceInput = $('[data-replace]', root);
   const caseInput = $('[data-case]', root);
   const findCountEl = $('[data-find-count]', root);
-  // Tools start collapsed on phones so the cue list is reachable.
-  if (window.matchMedia('(max-width: 700px)').matches) root.querySelectorAll('details.tool').forEach((d) => d.removeAttribute('open'));
+  // Tools: one tab visible at a time (WAI-ARIA tabs pattern).
+  const toolTabs = Array.from(root.querySelectorAll('[data-tool]'));
+  function showTool(tab, focus = false) {
+    toolTabs.forEach((t) => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', String(on));
+      t.tabIndex = on ? 0 : -1;
+      const panel = root.querySelector(`#${t.getAttribute('aria-controls')}`);
+      if (panel) panel.hidden = !on;
+    });
+    if (focus) tab.focus();
+  }
+  toolTabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => showTool(tab));
+    tab.addEventListener('keydown', (event) => {
+      const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      showTool(toolTabs[(i + step + toolTabs.length) % toolTabs.length], true);
+    });
+  });
   const kbd = $('.kbd-hint', root);
   if (kbd && !/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) kbd.textContent = 'Ctrl+S';
 

@@ -54,15 +54,20 @@ server. One container image works on CPU and NVIDIA GPUs.
   deleted media that never wipes an unmounted share.
 
 **Tools**
+- **Overview:** the job being subtitled right now shown as a media timeline (playhead, timecodes and
+  pipeline steps), what runs next, recent results and the last 24 hours at a glance.
 - **Studio:** drag and drop any video or audio file and download subtitles. No library needed.
 - **Subtitle editor:** video preview with live captions, timecode editing, split/merge, timing shift,
   find & replace, and readability warnings (reading speed, line length, overlaps).
-- **Model vault:** default models installed on first start, one-click recommended models, Hugging Face
-  search, download progress, and an offer to delete the old model when you switch.
-- **Queue:** filters, search, priorities, bulk cancel/retry/clear, per-file generation with
-  audio-track and language overrides.
+- **Models:** one table per model type with the model in use first, default models installed on first
+  start, one-click installs, Hugging Face search, download progress, and an offer to delete the old
+  model when you switch.
+- **Queue:** status filters, search, bulk cancel/retry/priority/clear, one clear action per job with
+  everything else in its details, and per-file generation with audio-track and language overrides.
 - Settings editor generated from the backend's settings schema, provider connection tests, an audit
   log, and database backup and restore.
+- Interface set in Atkinson Hyperlegible, a typeface designed for legibility, bundled so it works
+  offline; light and dark themes, keyboard navigable, and usable on a phone.
 
 **Security**
 - Single administrator with Argon2 password hashing, optional two-factor sign-in (TOTP, turned on from
@@ -77,7 +82,7 @@ server. One container image works on CPU and NVIDIA GPUs.
 | --- | --- |
 | ![Studio upload and generation](screenshots/web/studio.png) | ![Subtitle editor with video preview](screenshots/web/editor.png) |
 | **Library browser** | **Models** |
-| ![Library media browser](screenshots/web/library.png) | ![Model vault](screenshots/web/models.png) |
+| ![Library media browser](screenshots/web/library.png) | ![Models page grouped by model type](screenshots/web/models.png) |
 
 ## How it works
 
@@ -341,6 +346,9 @@ SubGen is released under the [MIT License](LICENSE). You may use, copy, modify, 
 distribute, sublicense and sell copies of the software, provided the copyright and permission notice is
 included in all copies or substantial portions of it. The software is provided "as is", without warranty
 of any kind.
+
+The web interface bundles the Atkinson Hyperlegible Next and Atkinson Hyperlegible Mono typefaces,
+which are licensed under the SIL Open Font License 1.1 (see `subgen/static/fonts/`).
 
 ---
 

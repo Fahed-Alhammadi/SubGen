@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
-  <meta name="theme-color" content="#f7f7f8" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#161617" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fbfbfc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#101012" media="(prefers-color-scheme: dark)">
   <title>SubGen</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/static/fonts/atkinson-next-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/base.css">
   <link rel="stylesheet" href="/static/css/components.css">
@@ -31,12 +32,14 @@
         <span class="brand-version" data-version></span>
       </a>
 
-      <nav aria-label="Main">
+      <nav class="nav" aria-label="Main">
         <ul class="nav-list">
           <li><a class="nav-link" href="/" data-nav="overview"><svg class="icon" aria-hidden="true"></svg><span>Overview</span></a></li>
-          <li><a class="nav-link" href="/studio" data-nav="studio"><svg class="icon" aria-hidden="true"></svg><span>Studio</span></a></li>
-          <li><a class="nav-link" href="/libraries" data-nav="libraries"><svg class="icon" aria-hidden="true"></svg><span>Libraries</span></a></li>
           <li><a class="nav-link" href="/queue" data-nav="queue"><svg class="icon" aria-hidden="true"></svg><span>Queue</span><span class="nav-count" data-queue-count hidden></span></a></li>
+          <li><a class="nav-link" href="/libraries" data-nav="libraries"><svg class="icon" aria-hidden="true"></svg><span>Libraries</span></a></li>
+          <li><a class="nav-link" href="/studio" data-nav="studio"><svg class="icon" aria-hidden="true"></svg><span>Studio</span></a></li>
+        </ul>
+        <ul class="nav-list nav-list-setup">
           <li><a class="nav-link" href="/models" data-nav="models"><svg class="icon" aria-hidden="true"></svg><span>Models</span></a></li>
           <li><a class="nav-link" href="/settings" data-nav="settings"><svg class="icon" aria-hidden="true"></svg><span>Settings</span></a></li>
           <li><a class="nav-link" href="/system" data-nav="system"><svg class="icon" aria-hidden="true"></svg><span>System</span></a></li>
@@ -47,7 +50,7 @@
         <a class="worker-pill" href="/" data-worker-pill data-state="unknown">
           <svg class="icon" aria-hidden="true"></svg><span class="label">Checking worker…</span>
         </a>
-        <div class="row">
+        <div class="account">
           <span class="sidebar-user truncate" data-user></span>
           <button type="button" class="btn btn-ghost btn-icon btn-sm" data-theme-toggle aria-label="Switch theme"></button>
           <button type="button" class="btn btn-ghost btn-icon btn-sm" data-logout aria-label="Sign out" title="Sign out"></button>

@@ -35,6 +35,16 @@ export function meter(value, label) {
   return html`<div class="meter" data-value="${v}" data-level="${level}" role="meter" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(v)}"><span></span></div>`;
 }
 
+/**
+ * Progress of the current step, 0-100: the media position while transcribing and the share of
+ * text translated while translating, so labels and bars agree with the Overview timeline.
+ */
+export function stageProgress(job) {
+  if (job.stage === 'transcribing' && job.duration_ms) return Math.min(100, ((job.processed_ms || 0) / job.duration_ms) * 100);
+  if (job.stage === 'translating') return Math.max(0, Math.min(100, (((job.progress || 81) - 81) / 15) * 100));
+  return Number(job.progress) || 0;
+}
+
 /** Short description of where a job is in the pipeline. */
 export function jobProgressText(job) {
   if (job.status === 'queued') return 'Waiting in queue';

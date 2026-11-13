@@ -36,7 +36,7 @@ const PROVIDERS = [
 export async function mount(ctx) {
   ctx.setTitle('Settings');
   const root = ctx.root;
-  render(root, html`${pageHeader({ title: 'Settings', subtitle: 'Pipeline defaults for every job. Individual jobs can override some of them.' })}${skeletonRows(6)}`);
+  render(root, html`${pageHeader({ title: 'Settings', subtitle: 'Defaults for every subtitle job, and sign-in security. Individual jobs can override some of them.' })}${skeletonRows(6)}`);
 
   let payload;
   let languages = [];
@@ -64,9 +64,9 @@ export async function mount(ctx) {
 
   render(
     root,
-    html`${pageHeader({ title: 'Settings', subtitle: 'Pipeline defaults for every job. Individual jobs can override some of them.' })}
+    html`${pageHeader({ title: 'Settings', subtitle: 'Defaults for every subtitle job, and sign-in security. Individual jobs can override some of them.' })}
     <form class="settings" novalidate data-form>
-      <div class="tabs settings-tabs" role="tablist" aria-label="Settings sections">
+      <div class="tabs settings-tabs" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
         ${groups.map(
           (g) => html`<button type="button" class="tab" role="tab" id="tab-${g}" aria-controls="panel-${g}" data-group="${g}" aria-selected="${g === activeGroup ? 'true' : 'false'}" tabindex="${g === activeGroup ? '0' : '-1'}">${GROUP_LABEL[g] || g}<span class="dirty-dot" hidden></span><span class="sr-only" data-dirty-sr></span></button>`,
         )}
@@ -259,8 +259,8 @@ export async function mount(ctx) {
   $('.settings-tabs', form).addEventListener('keydown', (event) => {
     const i = groups.indexOf(activeGroup);
     let next = null;
-    if (event.key === 'ArrowRight') next = groups[(i + 1) % groups.length];
-    else if (event.key === 'ArrowLeft') next = groups[(i - 1 + groups.length) % groups.length];
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = groups[(i + 1) % groups.length];
+    else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = groups[(i - 1 + groups.length) % groups.length];
     else if (event.key === 'Home') next = groups[0];
     else if (event.key === 'End') next = groups[groups.length - 1];
     if (next) {

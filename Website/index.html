@@ -64,7 +64,7 @@
               View source on GitHub
             </a>
           </div>
-          <p class="hero-note">New in 0.6: SubGen is now MIT licensed, frees GPU memory when idle, and checks disk space before uploads and model downloads. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
+          <p class="hero-note">New in 0.7: a redesigned interface, with a live media timeline for the job being subtitled, models grouped by type and a calmer queue. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
         </div>
 
         <figure class="player" id="player" aria-labelledby="player-caption">
@@ -282,7 +282,7 @@ everything that happened out there.</span></span><span class="warn">Reading spee
             <h3>Day to day</h3>
             <p>Manage models, the queue and settings from the browser, without opening a shell.</p>
             <dl>
-              <div><dt>Model vault</dt><dd>Default models install on first start. Install others in one click, watch the download progress, and delete the old model when you switch.</dd></div>
+              <div><dt>Models</dt><dd>Default models install on first start. Install others in one click, watch the download progress, and delete the old model when you switch.</dd></div>
               <div><dt>Queue</dt><dd>Priorities, cancel, retry and regenerate, bulk actions across many jobs, plus live speed and time remaining.</dd></div>
               <div><dt>Settings</dt><dd>Grouped, validated options for transcription, segmentation, translation, scanning, output and the Studio workspace, each with a reset to default.</dd></div>
               <div><dt>Activity and backups</dt><dd>A searchable audit log of edits, deletions, settings changes and sign-ins, with one-click database backup and validated restore.</dd></div>
@@ -331,10 +331,10 @@ everything that happened out there.</span></span><span class="warn">Reading spee
         <div class="gallery">
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/dashboard.png">
-              <img src="assets/screenshots/dashboard.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen overview page with worker status, the active job's progress, queued jobs and counts for the last 24 hours.">
+              <img src="assets/screenshots/dashboard.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen overview page with the file being transcribed shown on a media timeline with a playhead, the pipeline steps, the jobs up next and a summary of the last 24 hours.">
               <span class="shot-fallback" aria-hidden="true"><b>Overview</b>Screenshot coming soon</span>
             </a>
-            <figcaption><b>Overview.</b> Worker status, the running job and the last 24 hours at a glance.</figcaption>
+            <figcaption><b>Overview.</b> The file being subtitled on a live media timeline, what runs next and the last 24 hours.</figcaption>
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/studio.png">
@@ -345,35 +345,35 @@ everything that happened out there.</span></span><span class="warn">Reading spee
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/editor.png">
-              <img src="assets/screenshots/editor.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen subtitle editor with a video preview, a list of timed cues and readability warnings on cues that are too fast.">
+              <img src="assets/screenshots/editor.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen subtitle editor with a video preview, timing, find and check tools, and a list of timed cues.">
               <span class="shot-fallback" aria-hidden="true"><b>Editor</b>Screenshot coming soon</span>
             </a>
             <figcaption><b>Editor.</b> Edit cues against the video with timing tools and readability warnings.</figcaption>
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/library.png">
-              <img src="assets/screenshots/library.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen libraries page listing media folders with their target languages, output formats and scan results.">
+              <img src="assets/screenshots/library.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen library browser listing media files with their subtitle languages, formats and status.">
               <span class="shot-fallback" aria-hidden="true"><b>Libraries</b>Screenshot coming soon</span>
             </a>
-            <figcaption><b>Libraries.</b> Target languages, formats and subtitle coverage for each folder.</figcaption>
+            <figcaption><b>Library.</b> Every file with the subtitles it has, is waiting for, or is missing.</figcaption>
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/queue.png">
-              <img src="assets/screenshots/queue.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen job queue with priorities, job stages, progress, speed and estimated time remaining, and bulk action controls.">
+              <img src="assets/screenshots/queue.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen job queue with status filters, each job's stage and progress, and one action per job.">
               <span class="shot-fallback" aria-hidden="true"><b>Queue</b>Screenshot coming soon</span>
             </a>
-            <figcaption><b>Queue.</b> Priorities, bulk actions, and live speed and time remaining.</figcaption>
+            <figcaption><b>Queue.</b> Status filters, live progress and one clear action per job.</figcaption>
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/models.png">
-              <img src="assets/screenshots/models.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen model vault with recommended Whisper and translation models, installed models and a download in progress.">
-              <span class="shot-fallback" aria-hidden="true"><b>Model vault</b>Screenshot coming soon</span>
+              <img src="assets/screenshots/models.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen models page with one table per model type, the model in use first, then installed and available models.">
+              <span class="shot-fallback" aria-hidden="true"><b>Models</b>Screenshot coming soon</span>
             </a>
-            <figcaption><b>Model vault.</b> One-click recommended models with download progress.</figcaption>
+            <figcaption><b>Models.</b> One table per model type, with the model in use first.</figcaption>
           </figure>
           <figure class="shot">
             <a class="shot-frame" href="assets/screenshots/settings.png">
-              <img src="assets/screenshots/settings.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen settings page with tabs for transcription, segmentation, translation, scanning, output and workspace options.">
+              <img src="assets/screenshots/settings.png" width="1440" height="900" loading="lazy" decoding="async" alt="SubGen settings page with a section menu for transcription, segmentation, translation, scanning, output, workspace and security.">
               <span class="shot-fallback" aria-hidden="true"><b>Settings</b>Screenshot coming soon</span>
             </a>
             <figcaption><b>Settings.</b> Validated options grouped by pipeline stage.</figcaption>
@@ -429,7 +429,7 @@ SUBGEN_SECRET_KEY=replace-with-at-least-32-random-characters</code></pre>
           </li>
           <li>
             <h3>Let the models install and add a library</h3>
-            <p>Open <code>http://127.0.0.1:8080</code> and sign in. Whisper Small and NLLB-200 600M install by themselves on first start (about 3 GB); the Model vault shows the progress. On a GPU, switch to a larger Whisper model there. Then add each mounted folder under Libraries, choose its languages and formats, and select Scan now.</p>
+            <p>Open <code>http://127.0.0.1:8080</code> and sign in. Whisper Small and NLLB-200 600M install by themselves on first start (about 3 GB); the Models page shows the progress. On a GPU, switch to a larger Whisper model there. Then add each mounted folder under Libraries, choose its languages and formats, and select Scan now.</p>
           </li>
         </ol>
 

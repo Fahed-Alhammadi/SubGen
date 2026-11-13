@@ -22,12 +22,12 @@ export async function mount(ctx) {
     root,
     html`${pageHeader({
       title: 'Libraries',
-      subtitle: 'Folders SubGen watches. Subtitles are written next to each media file.',
+      subtitle: 'Folders SubGen watches for media. Each subtitle is written next to its media file.',
       actions: html`
         <button type="button" class="btn" data-action="scan-all">${icon('scan')}Scan all</button>
         <button type="button" class="btn btn-primary" data-action="add">${icon('plus')}Add library</button>`,
     })}
-    <div class="library-grid" data-slot="list">${skeletonRows(2, 'block')}</div>`,
+    <div data-slot="list">${skeletonRows(2, 'block')}</div>`,
   );
   const listEl = $('[data-slot=list]', root);
   let libraries = [];
@@ -55,7 +55,21 @@ export async function mount(ctx) {
       );
       return;
     }
-    render(listEl, html`${libraries.map((lib) => libraryCard(lib, languages))}`);
+    render(
+      listEl,
+      html`<section class="panel" aria-label="Libraries"><div class="table-wrap"><table class="table libraries-table">
+        <thead><tr>
+          <th scope="col">Library</th>
+          <th scope="col">Subtitles</th>
+          <th scope="col" class="num">Files</th>
+          <th scope="col">Jobs</th>
+          <th scope="col">Last scan</th>
+          <th scope="col">Watch</th>
+          <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody>${libraries.map((lib) => libraryRow(lib, languages))}</tbody>
+      </table></div></section>`,
+    );
   }
 
   const find = (el) => libraries.find((l) => l.id === Number(el.dataset.id));
@@ -155,41 +169,50 @@ export function reportScanErrors(res = {}) {
   if (res.errors && res.errors.length) notify.warn(`Some libraries could not be scanned: ${res.errors.join('; ')}`);
 }
 
-function libraryCard(lib, languages) {
+function libraryRow(lib, languages) {
   const j = lib.jobs || {};
-  return html`<article class="panel library-card" data-enabled="${lib.enabled ? 'true' : 'false'}">
-    <div class="library-head">
-      <span class="file-icon">${icon('folder')}</span>
-      <div class="library-title">
-        <h2><a href="/libraries/${lib.id}">${lib.name}</a></h2>
-        <code class="library-path break">${lib.path}</code>
+  const waiting = (j.queued || 0) + (j.processing || 0);
+  return html`<tr data-enabled="${lib.enabled ? 'true' : 'false'}">
+    <td>
+      <div class="media-cell">
+        <span class="file-icon">${icon('folder')}</span>
+        <div class="min0">
+          <a class="cell-title" href="/libraries/${lib.id}">${lib.name}</a>
+          <code class="library-path truncate" title="${lib.path}">${lib.path}</code>
+        </div>
       </div>
+    </td>
+    <td class="col-targets">
+      <div class="targets">
+        <div class="chips" aria-label="Subtitle languages">
+          ${(lib.languages || []).map((code) => html`<span class="badge plain" data-tone="outline" title="${languageName(languages, code)}">${String(code).toUpperCase()}</span>`)}
+        </div>
+        <span class="small muted">${(lib.formats || []).map((f) => f.toUpperCase()).join(', ')}</span>
+      </div>
+    </td>
+    <td class="num col-files">${number(lib.media_count || 0)}</td>
+    <td class="col-jobs">
+      <span class="job-counts">
+        <span><strong class="num">${number(j.completed || 0)}</strong> done</span>
+        <span><strong class="num">${number(waiting)}</strong> waiting${j.failed ? html`, <span class="tone-danger"><strong class="num">${number(j.failed)}</strong> failed</span>` : ''}</span>
+      </span>
+    </td>
+    <td class="col-scan small muted nowrap">${lib.last_scan_at ? html`<time datetime="${lib.last_scan_at}" title="${dateTime(lib.last_scan_at)}">${relative(lib.last_scan_at)}</time>` : 'Not scanned yet'}</td>
+    <td class="col-watch">
       <label class="switch" title="${lib.enabled ? 'Watching this folder' : 'Paused'}">
         <input type="checkbox" role="switch" data-action="toggle" data-id="${lib.id}" ${lib.enabled ? 'checked' : ''} aria-label="Watch ${lib.name}">
         <span class="small muted">${lib.enabled ? 'On' : 'Paused'}</span>
       </label>
-    </div>
-    <div class="library-langs">
-      <div class="chips" aria-label="Target languages">
-        ${(lib.languages || []).map((code) => html`<span class="chip" title="${languageName(languages, code)}">${String(code).toUpperCase()}</span>`)}
+    </td>
+    <td class="col-actions">
+      <div class="btn-group">
+        <a class="btn btn-sm" href="/libraries/${lib.id}">Browse</a>
+        <button type="button" class="btn btn-sm" data-action="scan" data-id="${lib.id}">${icon('scan')}Scan</button>
+        <button type="button" class="btn btn-sm btn-ghost btn-icon" data-action="edit" data-id="${lib.id}" aria-label="Edit ${lib.name}" title="Edit">${icon('edit')}</button>
+        <button type="button" class="btn btn-sm btn-ghost btn-icon btn-danger" data-action="remove" data-id="${lib.id}" aria-label="Remove ${lib.name}" title="Remove">${icon('trash')}</button>
       </div>
-      <span class="muted small">${(lib.formats || []).map((f) => f.toUpperCase()).join(', ')}</span>
-    </div>
-    <dl class="library-stats">
-      <div><dt>Media</dt><dd class="num">${number(lib.media_count || 0)}</dd></div>
-      <div><dt>Queued</dt><dd class="num">${number((j.queued || 0) + (j.processing || 0))}</dd></div>
-      <div><dt>Done</dt><dd class="num">${number(j.completed || 0)}</dd></div>
-      <div><dt>Failed</dt><dd class="num ${j.failed ? 'tone-danger' : ''}">${number(j.failed || 0)}</dd></div>
-    </dl>
-    <div class="library-foot">
-      <span class="muted small">${lib.last_scan_at ? html`Scanned <time datetime="${lib.last_scan_at}" title="${dateTime(lib.last_scan_at)}">${relative(lib.last_scan_at)}</time>` : 'Not scanned yet'}</span>
-      <span class="spacer"></span>
-      <a class="btn btn-sm" href="/libraries/${lib.id}">${icon('film')}Browse</a>
-      <button type="button" class="btn btn-sm" data-action="scan" data-id="${lib.id}">${icon('scan')}Scan</button>
-      <button type="button" class="btn btn-sm btn-ghost btn-icon" data-action="edit" data-id="${lib.id}" aria-label="Edit ${lib.name}" title="Edit">${icon('edit')}</button>
-      <button type="button" class="btn btn-sm btn-ghost btn-icon btn-danger" data-action="remove" data-id="${lib.id}" aria-label="Remove ${lib.name}" title="Remove">${icon('trash')}</button>
-    </div>
-  </article>`;
+    </td>
+  </tr>`;
 }
 
 /** Add / edit dialog. Resolves true when saved. */

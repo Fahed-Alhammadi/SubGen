@@ -252,14 +252,24 @@ function paintWorker(state) {
   const w = state.worker;
   const s = state.offline ? 'offline' : w ? w.state : 'unknown';
   let label = WORKER_LABELS[s] || 'Checking…';
-  if (s === 'processing' && state.jobs) label = `Processing, ${state.jobs.queued || 0} queued`;
-  if (s === 'error' && w && w.message) label = 'Worker error';
+  if (s === 'error') label = 'Worker error';
+  // Second line of the sidebar readout (hidden in the compact mobile pill).
+  const queued = state.jobs ? state.jobs.queued || 0 : 0;
+  let detail = '';
+  if (s === 'processing') detail = queued ? `${queued} more queued` : 'Nothing else queued';
+  else if (s === 'idle') detail = queued ? `${queued} queued` : 'Nothing queued';
+  else if (s === 'loading') detail = (w && (w.message || w.model)) || '';
+  else if (s === 'error') detail = 'See Overview for the error';
+  else if (s === 'offline') detail = 'Cannot reach the server';
   $$('[data-worker-pill]').forEach((pill) => {
     pill.dataset.state = s;
-    render(pill, html`${icon(WORKER_ICON[s] || 'circle', { cls: s === 'processing' ? 'spin' : '' })}<span class="label"></span>`);
+    render(pill, html`${icon(WORKER_ICON[s] || 'circle', { cls: s === 'processing' ? 'spin' : '' })}<span class="label"></span><span class="detail"></span>`);
     pill.querySelector('.label').textContent = label;
+    const detailEl = pill.querySelector('.detail');
+    detailEl.textContent = detail;
+    detailEl.hidden = !detail;
     pill.title = w && w.model ? `Worker: ${label}. Model ${w.model} on ${w.device || 'unknown device'}` : `Worker: ${label}`;
-    pill.setAttribute('aria-label', `Worker status: ${label}`);
+    pill.setAttribute('aria-label', `Worker status: ${label}${detail ? `, ${detail}` : ''}`);
   });
   const count = state.jobs ? (state.jobs.queued || 0) + (state.jobs.processing || 0) : 0;
   const badge = $('[data-queue-count]');

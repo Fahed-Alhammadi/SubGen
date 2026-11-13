@@ -1,4 +1,5 @@
 import logging
+import mimetypes
 import threading
 import time
 from contextlib import asynccontextmanager
@@ -27,6 +28,8 @@ logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(leveln
 logger = logging.getLogger("subgen")
 stop_event = threading.Event()
 static_path = Path(__file__).parent / "static"
+# Bundled UI fonts; minimal containers may lack a MIME entry for them (responses send nosniff).
+mimetypes.add_type("font/woff2", ".woff2")
 
 APP_SECTIONS = {"studio", "libraries", "queue", "editor", "models", "settings", "system"}
 
