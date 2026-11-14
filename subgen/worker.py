@@ -19,7 +19,7 @@ from .pipeline import (
     worker_state,
 )
 from .segmentation import Cue
-from .settings_store import all_values
+from .settings_store import all_values, current
 from .subtitles import write_subtitles
 
 logger = logging.getLogger(__name__)
@@ -115,6 +115,8 @@ def run_job(ctx: JobContext, engine: Engine) -> None:
     try:
         with SessionLocal() as db:
             values = job_values(all_values(db), ctx.options)
+        engine.configure(values)
+        set_state(device=engine.device, compute_type=engine.compute)
         transcript = transcribe(ctx, values, reporter, engine)
         cues = produce_cues(ctx, values, transcript, reporter, engine)
         if not cues:
@@ -165,6 +167,7 @@ def _model_being_installed() -> str | None:
 
 def worker_loop(stop: threading.Event) -> None:
     engine = Engine()
+    engine.configure(current())
     set_state(device=engine.device, compute_type=engine.compute)
     while not stop.is_set():
         try:

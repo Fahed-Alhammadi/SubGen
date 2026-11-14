@@ -2,14 +2,19 @@
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04 AS runtime
 ARG TARGETARCH
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+# Writable home and Hugging Face cache for the unprivileged user (PUID) inside the mounted volumes.
+ENV HOME=/config HF_HOME=/models/huggingface
 RUN apt-get update && apt-get install -y --no-install-recommends python3.12 python3-pip ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY subgen ./subgen
 RUN python3 -m pip install --break-system-packages .
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/subgen-entrypoint
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8080/health || exit 1
+# Starts as root only to hand /config and /models to PUID:PGID, then runs SubGen as that user.
+ENTRYPOINT ["/usr/local/bin/subgen-entrypoint"]
 CMD ["python3", "-m", "uvicorn", "subgen.main:app", "--host", "0.0.0.0", "--port", "8080"]
 

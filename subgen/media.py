@@ -94,7 +94,7 @@ def scan_library(db: Session, library: Library, values: dict[str, Any] | None = 
         return {"found": 0, "queued": 0, "skipped": 0, "pruned": 0}
     root = validate_library_path(library.path)
     values = values or all_values(db)
-    stable_seconds = get_settings().stable_file_seconds
+    stable_seconds = int(values["stable_file_seconds"])
     is_ignored = ignore_matcher(str(values.get("ignore_patterns", "")))
     skip_existing = bool(values.get("skip_existing_subtitles", True))
     skip_embedded = bool(values.get("skip_embedded_subtitles", False))

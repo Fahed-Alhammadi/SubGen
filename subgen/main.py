@@ -21,10 +21,12 @@ from .guard import RequestGuard
 from .media import cleanup_workspace, scan_library, workspace_library
 from .models import ensure_selected_models
 from .security import is_authenticated, require_csrf
-from .settings_store import all_values
+from .settings_store import all_values, apply_log_level
 from .worker import recover_interrupted_jobs, selected_models, worker_loop
 
 logging.basicConfig(level=get_settings().log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# The form parser logs its internals for every request at debug level; that drowns out SubGen's own lines.
+logging.getLogger("python_multipart").setLevel(logging.INFO)
 logger = logging.getLogger("subgen")
 stop_event = threading.Event()
 static_path = Path(__file__).parent / "static"
@@ -82,6 +84,7 @@ def maintenance_loop() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    apply_log_level()  # the level saved in Settings → System replaces SUBGEN_LOG_LEVEL
     recover_interrupted_jobs()
     with SessionLocal() as db:
         workspace_library(db)

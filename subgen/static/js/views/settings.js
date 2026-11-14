@@ -8,7 +8,7 @@ import { languageOptions } from '../ui/lang-picker.js';
 import { getLanguages } from '../store.js';
 import { plural } from '../ui/format.js';
 
-const GROUP_ORDER = ['transcription', 'segmentation', 'translation', 'scanning', 'output', 'workspace'];
+const GROUP_ORDER = ['transcription', 'segmentation', 'translation', 'scanning', 'output', 'workspace', 'system', 'security'];
 const GROUP_LABEL = {
   transcription: 'Transcription',
   segmentation: 'Segmentation',
@@ -16,6 +16,7 @@ const GROUP_LABEL = {
   scanning: 'Scanning',
   output: 'Output',
   workspace: 'Workspace',
+  system: 'System',
   security: 'Security',
 };
 const GROUP_INTRO = {
@@ -25,6 +26,7 @@ const GROUP_INTRO = {
   scanning: 'When and how libraries are checked for new media.',
   output: 'How subtitle files are written next to your media.',
   workspace: 'Studio uploads and temporary files.',
+  system: 'Disk space and logging.',
   security: 'Sign-in protection for the administrator account.',
 };
 const PROVIDERS = [
@@ -59,7 +61,8 @@ export async function mount(ctx) {
   const original = { ...(payload.values || {}) };
   const fieldByKey = new Map(schema.map((f) => [f.key, f]));
   const cleared = new Set(); // secret keys the user asked to clear
-  const groups = [...GROUP_ORDER.filter((g) => schema.some((f) => f.group === g)), ...[...new Set(schema.map((f) => f.group))].filter((g) => !GROUP_ORDER.includes(g)), 'security'];
+  // Security is always shown: two-factor sign-in has its own controls there.
+  const groups = [...GROUP_ORDER.filter((g) => g === 'security' || schema.some((f) => f.group === g)), ...[...new Set(schema.map((f) => f.group))].filter((g) => !GROUP_ORDER.includes(g))];
   let activeGroup = groups.includes(ctx.query.get('tab')) ? ctx.query.get('tab') : groups[0];
 
   render(
@@ -75,11 +78,12 @@ export async function mount(ctx) {
         (g) => html`<section class="panel settings-panel" role="tabpanel" id="panel-${g}" aria-labelledby="tab-${g}" data-panel="${g}" ${g === activeGroup ? '' : 'hidden'}>
           <div class="panel-head"><div><h2>${GROUP_LABEL[g] || g}</h2><p class="small muted">${GROUP_INTRO[g] || ''}</p></div></div>
           ${g === 'translation' ? providerTests() : ''}
-          ${g === 'security'
-            ? html`<div class="security" data-security>${skeletonRows(2)}</div>`
-            : html`<div class="settings-fields">
+          ${g === 'security' ? html`<div class="security" data-security>${skeletonRows(2)}</div>` : ''}
+          ${schema.some((f) => f.group === g)
+            ? html`<div class="settings-fields">
               ${schema.filter((f) => f.group === g).map((f) => fieldRow(f, original[f.key], languages, models))}
-            </div>`}
+            </div>`
+            : ''}
         </section>`,
       )}
       <div class="savebar" data-savebar hidden>

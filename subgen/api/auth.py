@@ -6,8 +6,8 @@ from ..config import get_settings
 from ..db import SessionLocal
 from ..security import (
     PENDING_SECONDS, authenticate, client_ip, login_succeeded, new_totp_secret, pending_token, pending_valid,
-    require_auth, reserve_login_attempt, revoke_all_sessions, session_token, store_totp_secret,
-    totp_enabled, totp_managed_by_env, totp_secret, totp_uri, verify_totp,
+    require_auth, reserve_login_attempt, revoke_all_sessions, secure_cookies, session_seconds, session_token,
+    store_totp_secret, totp_enabled, totp_managed_by_env, totp_secret, totp_uri, verify_totp,
 )
 from .common import audit
 
@@ -35,13 +35,12 @@ def _audit(event: str, username: str, request: Request, detail: str = "") -> Non
         db.commit()
 
 
-def _start_session(response: Response) -> None:
-    settings = get_settings()
+def _start_session(request: Request, response: Response) -> None:
     token, csrf = session_token()
+    secure, max_age = secure_cookies(request), session_seconds()
     for name, value, http_only in (("subgen_session", token, True), ("subgen_csrf", csrf, False)):
         response.set_cookie(
-            name, value, httponly=http_only, secure=settings.secure_cookies, samesite="strict",
-            max_age=settings.session_hours * 3600,
+            name, value, httponly=http_only, secure=secure, samesite="strict", max_age=max_age,
         )
     response.delete_cookie(PENDING_COOKIE, path=PENDING_PATH)
 
@@ -60,9 +59,8 @@ def login(
         raise HTTPException(401, "Invalid username or password")
     if totp_enabled():
         if not totp_code.strip():
-            settings = get_settings()
             response.set_cookie(
-                PENDING_COOKIE, pending_token(), httponly=True, secure=settings.secure_cookies,
+                PENDING_COOKIE, pending_token(), httponly=True, secure=secure_cookies(request),
                 samesite="strict", max_age=PENDING_SECONDS, path=PENDING_PATH,
             )
             return {"ok": False, "totp_required": True}
@@ -71,7 +69,7 @@ def login(
             raise HTTPException(401, "Invalid authenticator code")
     login_succeeded(key)
     _audit("auth.login", username, request)
-    _start_session(response)
+    _start_session(request, response)
     return {"ok": True}
 
 
@@ -88,7 +86,7 @@ def login_totp(request: Request, response: Response, totp_code: str = Form(max_l
         raise HTTPException(401, "Invalid authenticator code")
     login_succeeded(key)
     _audit("auth.login", username, request)
-    _start_session(response)
+    _start_session(request, response)
     return {"ok": True}
 
 

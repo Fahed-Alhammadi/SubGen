@@ -16,9 +16,7 @@ jobs:
           cache: pip
       - run: pip install ruff==0.14.5
       - run: ruff check .
-      - run: docker compose config --quiet
-        env:
-          SUBGEN_ADMIN_PASSWORD: ci-password-with-12-characters
-          SUBGEN_SECRET_KEY: ci-secret-key-that-is-at-least-32-characters
+      - run: cp .env.example .env && docker compose config --quiet
+      - run: shellcheck docker/entrypoint.sh
       - run: docker build --check .
 

@@ -44,14 +44,24 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.build.outputs.digest }}
       - name: Smoke test published image
+        # Same settings as docker-compose.yaml: only the password, hardened, PUID/PGID 1000 by default.
         run: |
           docker run -d --name subgen-smoke -p 127.0.0.1:18080:8080 \
+            --cap-drop ALL --cap-add CHOWN --cap-add SETUID --cap-add SETGID \
+            --security-opt no-new-privileges:true \
             -e SUBGEN_ADMIN_PASSWORD=release-smoke-password \
-            -e SUBGEN_SECRET_KEY=release-smoke-secret-key-at-least-32-characters \
-            -e SUBGEN_SECURE_COOKIES=false \
+            -e SUBGEN_AUTO_INSTALL_MODELS=false \
             ghcr.io/fahed-alhammadi/subgen@${{ steps.build.outputs.digest }}
           for attempt in {1..30}; do
-            curl -fsS http://127.0.0.1:18080/health && exit 0
+            if curl -fsS http://127.0.0.1:18080/health; then
+              # The server runs as 1000:1000, not root
+              test "$(docker exec subgen-smoke stat -c %u:%g /proc/1)" = "1000:1000"
+              # Sign-in works over plain HTTP (cookies are only marked Secure behind HTTPS)
+              curl -fsS -c jar -d username=admin -d password=release-smoke-password \
+                http://127.0.0.1:18080/api/login
+              curl -fsS -b jar http://127.0.0.1:18080/api/session
+              exit 0
+            fi
             sleep 2
           done
           docker logs subgen-smoke

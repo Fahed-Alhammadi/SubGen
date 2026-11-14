@@ -1,20 +1,23 @@
-# SubGen HTTP API (v0.7)
+# SubGen HTTP API (v0.8)
 
 All endpoints are same-origin JSON unless noted. The web UI is the only intended client.
 
 ## Conventions
 
-- **Auth:** a successful sign-in sets two cookies: `subgen_session` (HttpOnly) and `subgen_csrf` (readable).
-  Every `POST`/`PUT`/`PATCH`/`DELETE` (except the two login endpoints) must send header
+- **Auth:** a successful sign-in sets two cookies: `subgen_session` (HttpOnly) and `subgen_csrf` (readable),
+  both lasting the `session_hours` setting. They are marked `Secure` when the request arrived over HTTPS,
+  directly or with `X-Forwarded-Proto: https` / `Forwarded: proto=https` (unless `SUBGEN_SECURE_COOKIES`
+  forces it). Every `POST`/`PUT`/`PATCH`/`DELETE` (except the two login endpoints) must send header
   `x-csrf-token: <subgen_csrf cookie>`.
 - **Pages:** the UI uses real paths (`/queue`, `/editor/12`, `/settings?tab=security`), no `#`. `/`, `/studio`,
   `/libraries[/{id}]`, `/queue`, `/editor/{id}`, `/models`, `/settings` and `/system` serve the app; signed
   out, they redirect to `/login?next=<path>`.
 - **401** → session missing/expired; the UI redirects to `/login`. Unauthenticated `/api/*` requests are
   rejected before their body is read.
-- **507** → not enough disk space (uploads and model downloads keep `SUBGEN_MIN_FREE_MB` free).
-- **413** → request body too large: 1 MB for JSON endpoints, 64 MB for subtitle saves, `SUBGEN_MAX_UPLOAD_MB`
-  for uploads, 2 GB for restores.
+- **507** → not enough disk space (uploads and model downloads keep the `min_free_mb` setting free).
+- **413** → request body too large: 1 MB for JSON endpoints, 64 MB for subtitle saves, the `max_upload_mb`
+  setting for uploads, 2 GB for restores.
+- **429** → too many failed sign-ins from one address (`login_attempts` within `login_window_seconds`).
 - **Errors** always return `{"detail": "<human readable string>"}` (validation errors are flattened to a string).
 - **Timestamps** are ISO-8601 UTC strings (`2026-11-12T10:20:30.123456+00:00`) or `null`.
 - **Durations** are integer milliseconds.
@@ -169,14 +172,14 @@ and returns their ids. Existing sidecars are overwritten when the job completes.
 
 | Method | Path | Body | Response |
 | --- | --- | --- | --- |
-| GET | `/api/uploads/space?size=<bytes>` | – | `{ok}`; 413 over the upload limit, 507 when it would leave less than `SUBGEN_MIN_FREE_MB` free. The UI calls this before uploading |
+| GET | `/api/uploads/space?size=<bytes>` | – | `{ok}`; 413 over the upload limit, 507 when it would leave less than `min_free_mb` free. The UI calls this before uploading |
 | POST | `/api/uploads?filename=<name>` | raw file bytes (`application/octet-stream`) | `MediaItem`; 507 when the disk would run low (checked before and every 256 MB during the upload) |
 | GET | `/api/uploads` | – | `[MediaItem & {jobs: [Job], expires_at}]` newest first |
 | DELETE | `/api/uploads/{media_id}` | – | `{ok}` (deletes upload, its subtitles and jobs) |
 
 - Allowed extensions: video (`mkv mp4 m4v avi mov ts webm wmv flv mpg mpeg`) and audio
   (`mp3 m4a aac wav flac ogg opus mka wma`).
-- Max size comes from `SUBGEN_MAX_UPLOAD_MB` (default 20480); 413 when exceeded.
+- Max size comes from the `max_upload_mb` setting (default 20480); 413 when exceeded.
 - After upload, call `POST /api/media/{id}/generate`. Uploads expire after the
   `upload_retention_hours` setting.
 - Use `XMLHttpRequest` (`upload.onprogress`) to show upload progress.
@@ -215,9 +218,13 @@ punctuation at the end of the sentence. Reads strip bidi control characters, so 
     (free text is still allowed).
   - `language`: a language code from `/api/languages` (may include `auto` when listed in `options`).
   - `secret`: value is always returned as `""`; `is_set` tells whether a value is stored.
-- `group`: `transcription | segmentation | translation | scanning | output | workspace` (UI tabs, in this
-  order).
+- `group`: `transcription | segmentation | translation | scanning | output | workspace | system | security`
+  (UI tabs, in this order; Security also holds the two-factor controls from `/api/totp`).
 - `GET` returns values typed (bool/int/float), not strings.
+- Saved values apply without a restart, including `whisper_device`, `whisper_compute_type` (next job),
+  `max_upload_mb`, `min_free_mb`, `log_level`, `stable_file_seconds`, `session_hours` (existing sessions
+  too), `login_attempts` and `login_window_seconds`. Their `default` is the matching `SUBGEN_*`
+  environment variable when one is set (clamped to `min`/`max`), otherwise the built-in default.
 
 `PUT /api/settings` body `{"values": {<partial key/value map>}}` → `{ok, values}`.
 Only send changed keys. For a `secret`, omit it (or send `null`) to keep it, send `""` to clear it.
@@ -260,7 +267,7 @@ keys (so secrets need not be resent).
 
 `GET /api/system` →
 ```json
-{"version": "0.7.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
+{"version": "0.8.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
  "device_mode": "auto", "compute_type": "auto",
  "gpus": [{"name": "NVIDIA RTX 4090", "memory_total": 25757220864, "memory_used": 1200000000}],
  "disks": [{"label": "Models", "path": "/models", "total": 0, "free": 0},

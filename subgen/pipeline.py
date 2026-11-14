@@ -92,17 +92,29 @@ def set_state(**values: Any) -> None:
         worker_state.update(values, updated_at=utcnow().isoformat())
 
 
-def resolve_device() -> tuple[str, str]:
-    env = get_settings()
-    device = env.whisper_device
-    if device == "auto":
+_cuda_devices: int | None = None
+
+
+def _cuda_available() -> bool:
+    """Whether CTranslate2 sees an NVIDIA GPU (checked once; GPUs don't appear in a running container)."""
+    global _cuda_devices
+    if _cuda_devices is None:
         try:
             import ctranslate2
 
-            device = "cuda" if ctranslate2.get_cuda_device_count() > 0 else "cpu"
+            _cuda_devices = ctranslate2.get_cuda_device_count()
         except Exception:  # pragma: no cover - ctranslate2 is a hard dependency of faster-whisper
-            device = "cpu"
-    compute = env.whisper_compute_type
+            _cuda_devices = 0
+    return _cuda_devices > 0
+
+
+def resolve_device(values: dict[str, Any] | None = None) -> tuple[str, str]:
+    """(device, compute type) from Settings → Transcription; "auto" picks the GPU when there is one."""
+    values = values or {}
+    device = str(values.get("whisper_device") or "auto")
+    if device == "auto":
+        device = "cuda" if _cuda_available() else "cpu"
+    compute = str(values.get("whisper_compute_type") or "auto")
     if compute == "auto":
         compute = "float16" if device == "cuda" else "int8"
     return device, compute
@@ -135,6 +147,10 @@ class Engine:
 
     def loaded(self) -> bool:
         return self.whisper is not None or self.translator is not None
+
+    def configure(self, values: dict[str, Any]) -> None:
+        """Apply the device settings; models load again on next use when the device or precision changed."""
+        self.device, self.compute = resolve_device(values)
 
     def unload(self) -> None:
         """Release both models; CTranslate2 frees its memory when the model object is deleted."""

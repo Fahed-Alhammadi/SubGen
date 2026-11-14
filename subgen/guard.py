@@ -8,8 +8,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from .config import get_settings
 from .security import is_authenticated
+from .settings_store import current
 
 PUBLIC_API = {"/api/login", "/api/login/totp"}
 MIB = 1024 * 1024
@@ -17,7 +17,7 @@ MIB = 1024 * 1024
 
 def body_limit(method: str, path: str) -> int:
     if path == "/api/uploads":
-        return get_settings().max_upload_mb * MIB
+        return int(current()["max_upload_mb"]) * MIB
     if path == "/api/restore":
         return 2048 * MIB
     if method == "PUT" and path.startswith("/api/subtitles/"):

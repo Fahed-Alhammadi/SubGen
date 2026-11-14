@@ -13,14 +13,16 @@ from fastapi import HTTPException, Request, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from pwdlib import PasswordHash
 
-from .config import get_settings
+from .config import get_settings, load_secret_key
 from .db import AppSetting, SessionLocal, utcnow
+from .settings_store import current
 
 settings = get_settings()
 hasher = PasswordHash.recommended()
-serializer = URLSafeTimedSerializer(settings.secret_key.get_secret_value(), salt="subgen-session")
+_signing_key = load_secret_key(settings)
+serializer = URLSafeTimedSerializer(_signing_key, salt="subgen-session")
 # Proves the password step passed; only the authenticator code is asked for next.
-pending_serializer = URLSafeTimedSerializer(settings.secret_key.get_secret_value(), salt="subgen-totp-pending")
+pending_serializer = URLSafeTimedSerializer(_signing_key, salt="subgen-totp-pending")
 PENDING_SECONDS = 300
 LOGIN_PATHS = {"/api/login", "/api/login/totp"}  # exempt from CSRF tokens (no session exists yet)
 TOTP_KEY = "auth_totp_secret"  # app_settings row; not part of the pipeline settings schema
@@ -33,8 +35,15 @@ _verify_slots = threading.BoundedSemaphore(2)
 _last_totp_counter = -1
 
 
-def _trusted_proxies() -> set[str]:
-    return {item.strip() for item in settings.trusted_proxies.split(",") if item.strip()}
+def _trusted(address: str) -> bool:
+    """True when ``address`` is one of SUBGEN_TRUSTED_PROXIES (single addresses or ranges)."""
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return any(ip in network for network in settings.proxy_networks)
 
 
 def client_ip(request: Request) -> str:
@@ -44,8 +53,7 @@ def client_ip(request: Request) -> str:
     trustworthy. The leftmost entries are supplied by the client and are ignored.
     """
     peer = request.client.host if request.client else "unknown"
-    trusted = _trusted_proxies()
-    if peer not in trusted:
+    if not _trusted(peer):
         return peer
     for hop in reversed(request.headers.get("x-forwarded-for", "").split(",")):
         hop = hop.strip()
@@ -53,25 +61,54 @@ def client_ip(request: Request) -> str:
             address = str(ipaddress.ip_address(hop))
         except ValueError:
             break
-        if address not in trusted:
+        if not _trusted(address):
             return address
     return peer
+
+
+def secure_cookies(request: Request) -> bool:
+    """Whether to mark cookies Secure: SUBGEN_SECURE_COOKIES, or automatic from how the browser connected.
+
+    Automatic means HTTPS to SubGen itself or to a reverse proxy that says so in X-Forwarded-Proto or
+    Forwarded. Trusting those headers from anyone is safe here: a forged "https" only stops the forger's
+    own browser from keeping the cookie, and a browser on HTTPS sends neither header itself.
+    """
+    if settings.secure_cookies is not None:
+        return settings.secure_cookies
+    if request.url.scheme == "https":
+        return True
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    if any(part.strip().lower() == "https" for part in forwarded_proto.split(",")):
+        return True
+    forwarded = request.headers.get("forwarded", "").lower().replace(" ", "")
+    return "proto=https" in forwarded
 
 
 def reserve_login_attempt(request: Request) -> str | None:
     """Atomically check the throttle and count this attempt; returns the key, or None when blocked."""
     now = time.monotonic()
     key = client_ip(request)
+    window, allowed = _login_limits()
     with _login_lock:
-        for stale in [k for k, v in login_attempts.items() if not v or now - v[-1] > settings.login_window_seconds]:
+        for stale in [k for k, v in login_attempts.items() if not v or now - v[-1] > window]:
             login_attempts.pop(stale, None)
         attempts = login_attempts[key]
-        while attempts and now - attempts[0] > settings.login_window_seconds:
+        while attempts and now - attempts[0] > window:
             attempts.popleft()
-        if len(attempts) >= settings.login_attempts:
+        if len(attempts) >= allowed:
             return None
         attempts.append(now)
         return key
+
+
+def _login_limits() -> tuple[int, int]:
+    """(window in seconds, failed attempts allowed in it) from Settings → Security."""
+    values = current()
+    return int(values["login_window_seconds"]), int(values["login_attempts"])
+
+
+def session_seconds() -> int:
+    return int(current()["session_hours"]) * 3600
 
 
 def login_succeeded(key: str) -> None:
@@ -81,9 +118,10 @@ def login_succeeded(key: str) -> None:
 
 def login_allowed(request: Request) -> bool:
     now = time.monotonic()
+    window, allowed = _login_limits()
     with _login_lock:
         attempts = login_attempts.get(client_ip(request), deque())
-        return sum(1 for t in attempts if now - t <= settings.login_window_seconds) < settings.login_attempts
+        return sum(1 for t in attempts if now - t <= window) < allowed
 
 
 def record_login(request: Request, successful: bool) -> None:
@@ -210,7 +248,7 @@ def session_payload(request: Request) -> dict[str, str]:
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
     try:
-        payload = serializer.loads(token, max_age=settings.session_hours * 3600)
+        payload = serializer.loads(token, max_age=session_seconds())
     except (BadSignature, SignatureExpired) as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from exc
     if payload.get("generation") != session_generation:

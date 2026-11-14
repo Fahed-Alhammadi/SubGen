@@ -16,6 +16,7 @@ from ..audio import ffmpeg_version
 from ..config import get_settings
 from ..db import AuditEvent, Media, SessionLocal, Transcript, create_backup, iso, validate_database
 from ..pipeline import worker_state
+from ..settings_store import current
 from ..security import require_auth
 from .common import audit, like_escape, page
 
@@ -64,8 +65,8 @@ def system():
         ).one()
     return {
         "version": __version__, "platform": platform.platform(), "python": platform.python_version(),
-        "ffmpeg": ffmpeg_version(), "device_mode": settings.whisper_device,
-        "compute_type": settings.whisper_compute_type, "gpus": _gpus(),
+        "ffmpeg": ffmpeg_version(), "device_mode": current()["whisper_device"],
+        "compute_type": current()["whisper_compute_type"], "gpus": _gpus(),
         "disks": [_disk("Models", settings.model_dir), _disk("Config", settings.config_dir),
                   _disk("Media", settings.media_root), _disk("Workspace", settings.workspace)],
         "transcript_cache": {"count": cache_count, "bytes": int(cache_bytes)},

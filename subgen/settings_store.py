@@ -1,20 +1,23 @@
 """Schema-driven pipeline settings persisted in SQLite and edited from the web UI."""
 
+import logging
 import math
 import re
-from dataclasses import dataclass, field
+import threading
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from .config import get_settings
-from .db import AppSetting, utcnow
+from .config import COMPUTE_TYPES, LOG_LEVELS, get_settings
+from .db import AppSetting, SessionLocal, utcnow
 from .languages import LANGUAGES
 from .models import DEFAULT_TRANSLATION_MODEL, DEFAULT_WHISPER_MODEL
 
 # owner/model repository ids, or faster-whisper aliases such as "small" or "large-v3".
 _MODEL_NAME = re.compile(r"^(?!.*\.\.)([A-Za-z0-9][A-Za-z0-9._-]*/)?[A-Za-z0-9][A-Za-z0-9._-]*$")
-GROUPS = ("transcription", "segmentation", "translation", "scanning", "output", "workspace")
+GROUPS = ("transcription", "segmentation", "translation", "scanning", "output", "workspace", "system", "security")
+_COMPUTE_LABELS = {"auto": "Automatic (float16 on GPU, int8 on CPU)", "default": "As saved in the model"}
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,14 @@ def _schema() -> list[Field]:
         Field("transcription_model", "transcription", "Whisper model", "model", DEFAULT_WHISPER_MODEL,
               "Installed faster-whisper (CTranslate2) model used for speech recognition. Larger models "
               "are more accurate but slower.", model_kind="whisper", max_length=200),
+        Field("whisper_device", "transcription", "Processing device", "select", env.whisper_device,
+              "Where Whisper and the local translation model run. Automatic uses an NVIDIA GPU when the "
+              "container can see one, otherwise the CPU.",
+              options=(("auto", "Automatic"), ("cuda", "NVIDIA GPU (CUDA)"), ("cpu", "CPU"))),
+        Field("whisper_compute_type", "transcription", "Compute type", "select", env.whisper_compute_type,
+              "Number precision for Whisper. int8 uses less memory and is fastest on CPU; float16 suits "
+              "most GPUs. Older GPUs without float16 support need int8 or float32.",
+              options=tuple((value, _COMPUTE_LABELS.get(value, value)) for value in COMPUTE_TYPES)),
         Field("model_idle_minutes", "transcription", "Unload models when idle (minutes)", "int", 15,
               "Free the GPU memory and RAM held by the Whisper and local translation models when no job has "
               "run for this long. The next job loads them again, which takes a few seconds. 0 keeps them "
@@ -118,6 +129,10 @@ def _schema() -> list[Field]:
         Field("scan_interval_minutes", "scanning", "Scan interval (minutes)", "int", env.scan_interval_minutes,
               "How often enabled libraries are rescanned for new media. 0 disables scheduled scans.",
               min=0, max=10080, step=5),
+        Field("stable_file_seconds", "scanning", "Wait for copies to finish (seconds)", "int",
+              env.stable_file_seconds,
+              "A new file is processed only after it has stayed unchanged this long, so files still being "
+              "copied or downloaded are not picked up half-written.", min=0, max=86400, step=10),
         Field("skip_existing_subtitles", "scanning", "Skip existing subtitles", "bool", True,
               "Don't queue a language when a subtitle for it already sits beside the media (e.g. "
               "'Movie.eng.srt' or 'Movie.English.srt'). Forced-only subtitles don't count."),
@@ -141,10 +156,40 @@ def _schema() -> list[Field]:
         Field("upload_retention_hours", "workspace", "Keep Studio uploads for (hours)", "int", 72,
               "Uploaded files and their subtitles are deleted automatically after this time.",
               min=1, max=2160, step=1),
+        Field("max_upload_mb", "workspace", "Largest upload (MB)", "int", env.max_upload_mb,
+              "Studio refuses files bigger than this. 20480 MB is 20 GB.", min=1, max=1048576, step=1),
+        # System
+        Field("min_free_mb", "system", "Keep free disk space (MB)", "int", env.min_free_mb,
+              "Uploads and model downloads are refused when they would leave less than this free, so a "
+              "full disk can't break the database or subtitle writes.", min=0, max=1048576, step=128),
+        Field("log_level", "system", "Log detail", "select", env.log_level,
+              "How much SubGen writes to the container log (docker logs subgen). Debug is for "
+              "troubleshooting.",
+              options=tuple((value, value.capitalize()) for value in LOG_LEVELS)),
+        # Security (two-factor sign-in has its own controls on the same page)
+        Field("session_hours", "security", "Stay signed in for (hours)", "int", env.session_hours,
+              "After this long the browser has to sign in again.", min=1, max=8760, step=1),
+        Field("login_attempts", "security", "Failed sign-ins allowed", "int", env.login_attempts,
+              "Wrong passwords or codes from one address before it is blocked for the time below.",
+              min=1, max=100, step=1),
+        Field("login_window_seconds", "security", "Block period (seconds)", "int", env.login_window_seconds,
+              "How long failed sign-ins are remembered for one address.", min=10, max=86400, step=10),
     ]
 
 
-SCHEMA: list[Field] = _schema()
+def _within_range(item: Field) -> Field:
+    """Clamp a default seeded from the environment into the field's range (the UI blocks invalid values)."""
+    if item.type not in {"int", "float"} or isinstance(item.default, bool):
+        return item
+    value = item.default
+    if item.min is not None:
+        value = max(value, int(item.min) if item.type == "int" else item.min)
+    if item.max is not None:
+        value = min(value, int(item.max) if item.type == "int" else item.max)
+    return item if value == item.default else replace(item, default=value)
+
+
+SCHEMA: list[Field] = [_within_range(item) for item in _schema()]
 FIELDS: dict[str, Field] = {item.key: item for item in SCHEMA}
 
 
@@ -259,6 +304,7 @@ def set_values(db: Session, values: dict[str, Any]) -> None:
         else:
             db.add(AppSetting(key=key, value=serialized))
     db.commit()
+    invalidate()
 
 
 def reset_values(db: Session, keys: list[str]) -> None:
@@ -269,6 +315,39 @@ def reset_values(db: Session, keys: list[str]) -> None:
         if item:
             db.delete(item)
     db.commit()
+    invalidate()
+
+
+# Request guards and sign-in checks run on every request and outside a database session, so they read
+# a cached copy. Every write goes through set_values/reset_values (a restore restarts the process).
+_cache: dict[str, Any] | None = None
+_cache_lock = threading.Lock()
+
+
+def current() -> dict[str, Any]:
+    """Typed values for code without a database session (cached until the next save)."""
+    global _cache
+    with _cache_lock:
+        if _cache is None:
+            with SessionLocal() as db:
+                _cache = all_values(db)
+        return dict(_cache)  # a copy: callers must not change the shared values
+
+
+def invalidate() -> None:
+    global _cache
+    with _cache_lock:
+        _cache = None
+    apply_log_level()
+
+
+def apply_log_level() -> None:
+    """Use the saved log level (the environment only sets the level until Settings are read)."""
+    try:
+        level = current()["log_level"]
+    except Exception:  # the database may not exist yet during the first import
+        return
+    logging.getLogger().setLevel(level)
 
 
 def merged(db: Session, overrides: dict[str, Any] | None) -> dict[str, Any]:

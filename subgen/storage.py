@@ -1,13 +1,11 @@
 """Free-space checks so uploads and model downloads never fill the disk.
 
-SubGen keeps ``SUBGEN_MIN_FREE_MB`` (default 1 GB) free on the disk it writes to: a full disk would
-also break the database, the transcript cache and subtitle writes for the media server.
+SubGen keeps "Keep free disk space" (Settings → System, default 1 GB) free on the disk it writes to: a
+full disk would also break the database, the transcript cache and subtitle writes for the media server.
 """
 
 import shutil
 from pathlib import Path
-
-from .config import get_settings
 
 
 class NotEnoughSpace(Exception):
@@ -31,7 +29,9 @@ def free_bytes(path: Path) -> int:
 
 
 def require_space(path: Path, needed: int, what: str) -> None:
-    reserve = get_settings().min_free_mb * 1024 * 1024
+    from .settings_store import current  # settings_store imports models, which imports this module
+
+    reserve = int(current()["min_free_mb"]) * 1024 * 1024
     free = free_bytes(path)
     if free - needed < reserve:
         needs = f"it needs {human(needed)}, " if needed else ""

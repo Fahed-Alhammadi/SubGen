@@ -21,7 +21,7 @@ from ..audio import probe
 from ..media import delete_upload, library_root, load_probe, store_probe, workspace_library
 from ..paths import UPLOAD_EXTENSIONS, confined_path
 from ..security import require_auth
-from ..settings_store import all_values
+from ..settings_store import all_values, current
 from ..storage import NotEnoughSpace, require_space
 from .common import audit, job_dict, like_escape, media_dict, page, validate_targets
 
@@ -163,8 +163,9 @@ def upload_space(size: int):
     """Pre-flight for the browser: a refusal sent mid-upload often surfaces as a dropped connection."""
     if size < 0:
         raise HTTPException(422, "size must not be negative")
-    if size > get_settings().max_upload_mb * 1024 * 1024:
-        raise HTTPException(413, f"File is larger than the {get_settings().max_upload_mb} MB upload limit")
+    limit_mb = int(current()["max_upload_mb"])
+    if size > limit_mb * 1024 * 1024:
+        raise HTTPException(413, f"File is larger than the {limit_mb} MB upload limit")
     try:
         require_space(get_settings().workspace, size, "this upload")
     except NotEnoughSpace as exc:
@@ -175,10 +176,11 @@ def upload_space(size: int):
 @router.post("/api/uploads")
 async def upload(request: Request, filename: str):
     name = _safe_name(filename)
-    limit = get_settings().max_upload_mb * 1024 * 1024
+    limit_mb = int(current()["max_upload_mb"])
+    limit = limit_mb * 1024 * 1024
     declared = request.headers.get("content-length")
     if declared and declared.isdigit() and int(declared) > limit:
-        raise HTTPException(413, f"File is larger than the {get_settings().max_upload_mb} MB upload limit")
+        raise HTTPException(413, f"File is larger than the {limit_mb} MB upload limit")
     root = get_settings().workspace
     try:
         require_space(root, int(declared) if declared and declared.isdigit() else 0, "this upload")
@@ -193,7 +195,7 @@ async def upload(request: Request, filename: str):
             async for chunk in request.stream():
                 size += len(chunk)
                 if size > limit:
-                    raise HTTPException(413, f"File is larger than the {get_settings().max_upload_mb} MB upload limit")
+                    raise HTTPException(413, f"File is larger than the {limit_mb} MB upload limit")
                 if size - checked >= SPACE_CHECK_BYTES:
                     # Re-check while streaming: the size may be unknown, or other writes may fill the disk.
                     checked = size
