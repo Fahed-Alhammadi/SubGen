@@ -23,12 +23,22 @@ from .providers import (
 )
 from .segmentation import (
     Cue, Segment, SegmentationOptions, Word, apply_translation, assign_translation_units, build_cues,
-    clean_segments, finalize, match_source_case, normalize_script, segment_texts,
+    clean_segments, finalize, match_source_case, normalize_script, segment_texts, snap_to_speech,
 )
 
 logger = logging.getLogger(__name__)
 # Per-job overrides accepted from the API, and the settings they replace.
 JOB_OPTION_KEYS = {"source_language", "audio_track", "initial_prompt"}
+# Bump when audio preparation or decoding changes in a way that should redo cached transcripts.
+TRANSCRIPT_VERSION = 2
+# Whisper hears at most 30 seconds at once; speech clips are built up to this length.
+CLIP_SECONDS = 30.0
+# Neighbouring speech regions closer than this share a clip (with the real gap kept between them),
+# so short lines keep the context of the lines around them.
+CLIP_JOIN_GAP = 4.0
+# Audio kept around each speech region in a clip. faster-whisper uses 0.4 s; quiet lines whose soft
+# start voice detection notices late need more (tested: 0.4 s lost the first two words of a whisper).
+CLIP_PAD = 0.8
 
 
 class JobCancelled(Exception):
@@ -243,6 +253,70 @@ def _decode(row: Transcript) -> TranscriptData:
     return TranscriptData(row.language, row.duration_ms, segments, data.get("task", "transcribe"))
 
 
+def speech_regions(samples, values: dict[str, Any]) -> list[tuple[float, float]]:
+    """Unpadded speech regions (seconds) from voice detection, each at most 30 seconds long."""
+    from faster_whisper.vad import VadOptions, get_speech_timestamps
+
+    options = VadOptions(
+        threshold=float(values.get("vad_threshold") or 0.5),
+        min_silence_duration_ms=int(values["vad_min_silence_ms"]),
+        max_speech_duration_s=CLIP_SECONDS - 2 * CLIP_PAD,
+        speech_pad_ms=0,
+    )
+    return [
+        (r["start"] / audio.SAMPLE_RATE, r["end"] / audio.SAMPLE_RATE)
+        for r in get_speech_timestamps(samples, options)
+    ]
+
+
+def speech_clips(regions: list[tuple[float, float]], duration: float) -> list[tuple[float, float]]:
+    """Join speech regions into padded clips of at most 30 seconds for Whisper.
+
+    faster-whisper's own VAD path glues separate speech regions together with no gap and maps word
+    times back afterwards; a word near a join can land in the wrong region (seen: a word moved
+    10 seconds early into the previous line). Clips here keep their real position and the real
+    audio between joined regions, so word times never cross a join.
+    """
+    clips: list[tuple[float, float]] = []
+    for start, end in regions:
+        start, end = max(0.0, start - CLIP_PAD), min(duration, end + CLIP_PAD)
+        if clips and start - clips[-1][1] <= CLIP_JOIN_GAP and end - clips[-1][0] <= CLIP_SECONDS:
+            clips[-1] = (clips[-1][0], end)
+        elif clips and start < clips[-1][1]:
+            clips.append((clips[-1][1], end))  # padding overlapped a clip that is already full
+        else:
+            clips.append((start, end))
+    return clips
+
+
+def whisper_kwargs(
+    values: dict[str, Any], language: str | None, task: str, *, batched: bool,
+    clips: list[tuple[float, float]] | None = None,
+) -> dict[str, Any]:
+    """Decoding options for faster-whisper (batched or sequential)."""
+    prompt = str(values["initial_prompt"] or "").strip()
+    kwargs: dict[str, Any] = {
+        "language": language, "task": task, "beam_size": int(values["beam_size"]), "word_timestamps": True,
+        "initial_prompt": prompt or None, "condition_on_previous_text": False,
+    }
+    if clips:
+        # Our own speech clips replace faster-whisper's VAD (see speech_clips).
+        if batched:
+            kwargs["clip_timestamps"] = [{"start": start, "end": end} for start, end in clips]
+        else:
+            kwargs["clip_timestamps"] = [t for clip in clips for t in clip]
+    else:
+        kwargs["vad_filter"] = bool(values["vad_filter"]) or batched  # batched needs speech regions
+        if kwargs["vad_filter"]:
+            kwargs["vad_parameters"] = {
+                "min_silence_duration_ms": int(values["vad_min_silence_ms"]),
+                "threshold": float(values.get("vad_threshold") or 0.5),
+            }
+    if values["filter_hallucinations"] and not batched:
+        kwargs["hallucination_silence_threshold"] = 2.0  # sequential decoding only
+    return kwargs
+
+
 def transcribe(ctx: JobContext, values: dict[str, Any], reporter: Reporter, engine: Engine) -> TranscriptData:
     if not ctx.media_path.is_file():
         raise FileNotFoundError(f"Media file no longer exists: {ctx.media_path.name}")
@@ -269,10 +343,14 @@ def transcribe(ctx: JobContext, values: dict[str, Any], reporter: Reporter, engi
         task = "translate"
     prompt = str(values["initial_prompt"] or "").strip()
     repo = whisper_repo(str(values["transcription_model"]))
+    channels = audio.track_channels(info, track)
+    dialogue_mix = bool(values.get("dialogue_mix")) and channels >= 3
+    boost_speech = bool(values.get("boost_quiet_speech"))
     params = {
         "model": repo, "task": task, "language": languages.whisper_code(hint), "track": track,
         "beam": int(values["beam_size"]), "vad": bool(values["vad_filter"]),
-        "silence": int(values["vad_min_silence_ms"]), "prompt": prompt, "version": 1,
+        "silence": int(values["vad_min_silence_ms"]), "prompt": prompt, "version": TRANSCRIPT_VERSION,
+        "threshold": float(values.get("vad_threshold") or 0.5), "dialogue": dialogue_mix, "boost": boost_speech,
     }
     signature = hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest()
 
@@ -291,22 +369,21 @@ def transcribe(ctx: JobContext, values: dict[str, Any], reporter: Reporter, engi
     model, batched = engine.load_whisper(values)
     set_state(state="processing", job_id=ctx.job_id, message="")
     reporter.update(stage="extracting", progress=4, force=True)
-    samples = audio.load_audio(ctx.media_path, track, get_settings().max_media_hours * 3600)
+    samples = audio.load_audio(
+        ctx.media_path, track, get_settings().max_media_hours * 3600,
+        dialogue_mix=dialogue_mix, boost_speech=boost_speech,
+    )
     duration_ms = max(1, int(len(samples) / audio.SAMPLE_RATE * 1000))
     reporter.update(stage="transcribing", progress=5, force=True, duration_ms=duration_ms, processed_ms=0,
                     transcribe_started_at=utcnow())
 
-    kwargs: dict[str, Any] = {
-        "language": params["language"], "task": task, "beam_size": params["beam"], "word_timestamps": True,
-        "vad_filter": params["vad"], "initial_prompt": prompt or None, "condition_on_previous_text": False,
-    }
-    if params["vad"]:
-        kwargs["vad_parameters"] = {"min_silence_duration_ms": params["silence"]}
-    if values["filter_hallucinations"]:
-        kwargs["hallucination_silence_threshold"] = 2.0
     batch_size = int(values["batch_size"]) or (8 if engine.device == "cuda" else 0)
-    if batch_size > 1:
-        kwargs["vad_filter"] = True  # batched inference chunks audio by speech regions
+    use_batched = batch_size > 1
+    # Batched inference always needs speech regions; sequential decoding only when VAD is enabled.
+    regions = speech_regions(samples, values) if use_batched or params["vad"] else []
+    clips = speech_clips(regions, len(samples) / audio.SAMPLE_RATE) if regions else None
+    kwargs = whisper_kwargs(values, params["language"], task, batched=use_batched, clips=clips)
+    if use_batched:
         iterator, info = batched.transcribe(samples, batch_size=batch_size, **kwargs)
     else:
         iterator, info = model.transcribe(samples, **kwargs)
@@ -323,6 +400,7 @@ def transcribe(ctx: JobContext, values: dict[str, Any], reporter: Reporter, engi
         processed = min(duration_ms, int(item.end * 1000))
         reporter.update(progress=5 + int(processed / duration_ms * 75), processed_ms=processed)
     del samples
+    snap_to_speech(segments, regions)
 
     transcript = TranscriptData(detected, duration_ms, segments, task)
     with SessionLocal() as db:

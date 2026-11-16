@@ -64,7 +64,7 @@
               View source on GitHub
             </a>
           </div>
-          <p class="hero-note">New in 0.8: a shorter setup. Two small files with one required password; the device, upload, disk-space and sign-in limits moved into Settings. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
+          <p class="hero-note">New in 0.9: whispered and quiet dialogue is no longer skipped, and subtitles start when the voice does. See the <a href="https://github.com/Fahed-Alhammadi/SubGen/releases">release notes</a>.</p>
         </div>
 
         <figure class="player" id="player" aria-labelledby="player-caption">
@@ -167,7 +167,9 @@ the tide comes in.</b></span></p>
             <ul class="ticks">
               <li><strong>Re-segmentation</strong> by characters per line, lines per cue, minimum and maximum duration, and the gap between cues.</li>
               <li><strong>Line balancing</strong> splits two-line cues at natural points so neither line is a stub.</li>
-              <li><strong>Hallucination filtering</strong> drops the repeated phrases Whisper sometimes invents over silence and music.</li>
+              <li><strong>Quiet dialogue kept</strong>: surround audio is mixed towards the dialogue channel and whispers are boosted, so they reach Whisper instead of being skipped as silence.</li>
+              <li><strong>Subtitles in sync</strong>: the audio track's start delay is kept and each line starts where the voice does.</li>
+              <li><strong>Hallucination filtering</strong> drops the repeated phrases Whisper sometimes invents over silence and music, one sentence at a time.</li>
             </ul>
           </div>
           <div class="artifact">
@@ -461,7 +463,7 @@ SUBGEN_ADMIN_PASSWORD=change-me-to-a-long-password</code></pre>
         </ol>
 
         <div class="callout">
-          <p><strong>Updating.</strong> Back up the <code>config</code> folder, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version in the compose file, for example <code>ghcr.io/fahed-alhammadi/subgen:0.8</code>. Older compose and <code>.env</code> files keep working.</p>
+          <p><strong>Updating.</strong> Back up the <code>config</code> folder, then run <code>docker compose pull</code> and <code>docker compose up -d</code>. For reproducible deployments, pin a version in the compose file, for example <code>ghcr.io/fahed-alhammadi/subgen:0.9</code>. Older compose and <code>.env</code> files keep working.</p>
           <p><strong>Remote access.</strong> Put SubGen behind an HTTPS reverse proxy: publish the port as <code>"127.0.0.1:8080:8080"</code> when the proxy runs on the same host, or attach SubGen to the proxy's Docker network and set <code>SUBGEN_TRUSTED_PROXIES</code> to that network's range. Cookies switch to HTTPS-only automatically.</p>
         </div>
       </div>

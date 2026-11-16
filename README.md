@@ -32,8 +32,12 @@ server. One container image works on CPU and NVIDIA GPUs.
   and maximum on-screen time. Breaks prefer sentence ends, clauses and pauses.
 - Balanced two-line wrapping with CJK/Thai awareness, minimum gaps, no overlaps, and a short linger
   after speech.
+- Dialogue that is easy to miss is kept: surround audio is mixed towards the centre (dialogue)
+  channel, quiet speech and whispers are boosted, and voice detection is tuned for film dialogue.
+- Subtitles start when the voice does: the audio track's start delay is kept, and word times are
+  pulled onto the speech edges found by voice detection.
 - Hallucination filtering removes "Thanks for watching", subtitle credits and repetition loops
-  invented by Whisper during silence or music.
+  invented by Whisper during silence or music, one sentence at a time, so real lines around them stay.
 - Translation runs on sentence-sized units and is redistributed across the original cue timings, so
   translated subtitles stay in sync.
 
@@ -92,8 +96,9 @@ server. One container image works on CPU and NVIDIA GPUs.
 ## How it works
 
 ```text
-media file ─► ffprobe ─► choose audio track ─► ffmpeg (16 kHz mono)
-           ─► faster-whisper (word timestamps, VAD) ──► transcript cache
+media file ─► ffprobe ─► choose audio track ─► ffmpeg (dialogue mix, keep start delay,
+               boost quiet speech, 16 kHz mono) ─► voice detection ─► speech clips (≤ 30 s)
+           ─► faster-whisper (word timestamps) ─► snap words to speech ─► transcript cache
            ─► clean hallucinations ─► re-segment into readable cues
            ─► translate sentence units (if target ≠ spoken language)
            ─► balance lines, fix timing ─► atomic write: Movie.ar.srt / .ass / .vtt
@@ -234,6 +239,8 @@ Settings are edited in the web UI, stored in the database and apply without a re
 | | Preferred audio tracks | Default track |
 | | Beam size / batch size | 5 / auto (8 on GPU) |
 | | Skip silence (VAD), filter hallucinations | On |
+| | Speech detection threshold | 0.35 (lower keeps quieter speech) |
+| | Boost quiet speech, focus on the dialogue channel | On |
 | | Vocabulary prompt | Empty |
 | Segmentation | Characters per line / lines | 42 / 2 (≈19 for CJK) |
 | | Subtitle duration | 1.0 – 6.0 s, 80 ms gap, 250 ms linger |
@@ -349,7 +356,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Database migrations run automatically on start. Pin a version (`ghcr.io/fahed-alhammadi/subgen:0.8`)
+Database migrations run automatically on start. Pin a version (`ghcr.io/fahed-alhammadi/subgen:0.9`)
 for reproducible deployments.
 
 ### Upgrading from 0.7 or earlier

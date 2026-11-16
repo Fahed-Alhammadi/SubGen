@@ -8,6 +8,9 @@ common hallucinations and redistributes translated text across the cues of each 
 
 import math
 import re
+import zlib
+from bisect import bisect_right
+from itertools import groupby
 from dataclasses import dataclass, field
 
 SENTENCE_END = re.compile(r"[.!?…。！？؟]['\"”’»)\]]*$")
@@ -80,33 +83,96 @@ def _normalized(text: str) -> str:
     return _NORMALIZE.sub(" ", text.lower()).strip()
 
 
-def is_hallucination(segment: Segment) -> bool:
-    text = _normalized(segment.text)
-    if not text:
-        return True
-    if any(phrase in text for phrase in ALWAYS_HALLUCINATED):
-        return True
-    if text.startswith(CREDIT_PREFIXES) and len(text.split()) <= 8:
-        return True
+def _compression_ratio(text: str) -> float:
+    """Whisper's repetition measure: how well the text compresses (loops compress very well)."""
+    data = text.encode("utf-8")
+    return len(data) / len(zlib.compress(data)) if data else 0.0
+
+
+def _is_unsure_hallucination(segment: Segment, text: str) -> bool:
+    """Rules that rely on Whisper's own confidence, which is only known for the whole segment."""
     unsure = segment.no_speech_prob > 0.4 or segment.avg_logprob < -0.9
     if text in SUSPICIOUS_WHEN_UNSURE and unsure:
         return True
     # Whisper's own "probably silence" rule, applied again because VAD-less runs keep these.
-    if segment.no_speech_prob > 0.75 and segment.avg_logprob < -1.0:
+    return segment.no_speech_prob > 0.75 and segment.avg_logprob < -1.0
+
+
+def _is_text_hallucination(text: str, compression_ratio: float) -> bool:
+    """Rules that only need the (normalised) text, so they also work for one sentence."""
+    if any(phrase in text for phrase in ALWAYS_HALLUCINATED):
         return True
-    return segment.compression_ratio > 2.8 and len(text) > 30
+    if text.startswith(CREDIT_PREFIXES) and len(text.split()) <= 8:
+        return True
+    return compression_ratio > 2.8 and len(text) > 30
+
+
+def is_hallucination(segment: Segment) -> bool:
+    text = _normalized(segment.text)
+    if not text:
+        return True
+    return _is_unsure_hallucination(segment, text) or _is_text_hallucination(text, segment.compression_ratio)
+
+
+def _sentences(words: list[Word]) -> list[list[Word]]:
+    pieces: list[list[Word]] = [[]]
+    for word in words:
+        pieces[-1].append(word)
+        if SENTENCE_END.search(word.text.strip()):
+            pieces.append([])
+    return [piece for piece in pieces if piece]
+
+
+def _without_hallucinated_sentences(segment: Segment, pieces: list[list[Word]]) -> Segment | None:
+    """Drop only the hallucinated sentences of a multi-sentence segment.
+
+    On a GPU, batched decoding returns one segment per clip, up to 30 seconds of dialogue. Judging
+    such a segment as a whole dropped every real line in it when one sentence was a known
+    hallucination, or when a decoding loop made the whole text compress well (batched decoding has
+    no retry at a higher temperature). A run of three or more identical sentences is such a loop:
+    only its first sentence is kept.
+    """
+    kept: list[Word] = []
+    for key, run in groupby(pieces, key=lambda piece: _normalized(_join(piece))):
+        sentences = list(run)
+        if not key:
+            continue
+        for piece in sentences[:1] if len(sentences) >= 3 else sentences:
+            if not _is_text_hallucination(key, _compression_ratio(_join(piece))):
+                kept.extend(piece)
+    if not kept:
+        return None
+    if len(kept) == sum(len(piece) for piece in pieces):
+        return segment
+    text = _join(kept)
+    return Segment(kept[0].start, kept[-1].end, text, kept, segment.avg_logprob, segment.no_speech_prob,
+                   _compression_ratio(text))
 
 
 def clean_segments(segments: list[Segment], filter_hallucinations: bool = True) -> list[Segment]:
-    """Drop empty/hallucinated segments and collapse runaway repetitions (3+ identical in a row)."""
+    """Drop empty/hallucinated segments and collapse runaway repetitions (3+ identical in a row).
+
+    Segments with several sentences (and word timings) are filtered sentence by sentence, see
+    ``_without_hallucinated_sentences``.
+    """
     result: list[Segment] = []
     run_text, run_length = "", 0
     for segment in segments:
         segment.text = segment.text.strip()
         if not segment.text or segment.end <= segment.start:
             continue
-        if filter_hallucinations and is_hallucination(segment):
-            continue
+        if filter_hallucinations:
+            pieces = _sentences([w for w in segment.words if w.text.strip()])
+            if len(pieces) < 2:
+                if is_hallucination(segment):
+                    continue
+            else:
+                if _is_unsure_hallucination(segment, _normalized(segment.text)):
+                    continue
+                cleaned = _without_hallucinated_sentences(segment, pieces)
+                if cleaned is None:
+                    continue
+                segment = cleaned
         key = _normalized(segment.text)
         run_length = run_length + 1 if key == run_text else 1
         run_text = key
@@ -114,6 +180,49 @@ def clean_segments(segments: list[Segment], filter_hallucinations: bool = True) 
             continue
         result.append(segment)
     return result
+
+
+def snap_to_speech(
+    segments: list[Segment], regions: list[tuple[float, float]], max_shift: float = 0.8, lead: float = 0.2
+) -> list[Segment]:
+    """Move word edges that fall in silence towards the speech edges found by voice detection.
+
+    Whisper's word timestamps often start a line a few hundred milliseconds before the voice does
+    (sometimes with the whole first word in the silence before it), so subtitles appear early.
+    ``regions`` are unpadded speech regions in seconds. A start in silence moves to ``lead`` seconds
+    before the next speech onset (voice detection notices soft first sounds a little late); an end
+    in silence moves back to the last speech offset. Nothing moves more than ``max_shift``, a start
+    only moves later and an end only earlier, so words the detector missed (very quiet speech) stay
+    close to where Whisper put them.
+    """
+    if not regions:
+        return segments
+    starts = [start for start, _ in regions]
+
+    def inside(t: float) -> bool:
+        i = bisect_right(starts, t) - 1
+        return i >= 0 and regions[i][0] <= t <= regions[i][1]
+
+    for segment in segments:
+        words = segment.words
+        for index, word in enumerate(words):
+            if not inside(word.start):
+                i = bisect_right(starts, word.start)  # first region starting after the word start
+                if i < len(regions) and regions[i][0] - word.start <= max_shift:
+                    start = max(word.start, regions[i][0] - lead)
+                    if start >= word.end - 0.02:
+                        # The whole word sits before the onset: move it, keeping its length but not
+                        # running into the next word.
+                        following = words[index + 1].start if index + 1 < len(words) else math.inf
+                        word.end = max(start + 0.05, min(start + (word.end - word.start), following))
+                    word.start = start
+            if not inside(word.end):
+                i = bisect_right(starts, word.end) - 1  # last region starting before the word end
+                if i >= 0 and word.end - regions[i][1] <= max_shift and regions[i][1] > word.start + 0.02:
+                    word.end = regions[i][1]
+        if words:
+            segment.start, segment.end = words[0].start, words[-1].end
+    return segments
 
 
 def _join(words: list[Word]) -> str:

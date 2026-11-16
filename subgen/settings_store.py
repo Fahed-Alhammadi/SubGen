@@ -81,6 +81,16 @@ def _schema() -> list[Field]:
         Field("vad_min_silence_ms", "transcription", "Minimum silence (ms)", "int", 500,
               "Silence at least this long splits speech regions when VAD is enabled.",
               min=100, max=5000, step=50),
+        Field("vad_threshold", "transcription", "Speech detection threshold", "float", 0.35,
+              "How sure voice detection must be that a sound is speech. Lower keeps whispered and quiet "
+              "dialogue; higher skips more music and noise. 0.5 is the detector's own default.",
+              min=0.1, max=0.9, step=0.05),
+        Field("boost_quiet_speech", "transcription", "Boost quiet speech", "bool", True,
+              "Even out speech loudness before transcription, so whispers and quiet lines next to loud "
+              "scenes are heard."),
+        Field("dialogue_mix", "transcription", "Focus on the dialogue channel", "bool", True,
+              "For surround audio (5.1, 7.1), listen mainly to the centre channel, where films put "
+              "dialogue, instead of an even mix with music and effects."),
         Field("initial_prompt", "transcription", "Vocabulary prompt", "text", "",
               "Optional text giving Whisper names, terms and spelling style (e.g. character names). Keep it "
               "short.", max_length=800),
