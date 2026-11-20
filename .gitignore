@@ -2,6 +2,12 @@
 CLAUDE.md
 Keys/
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.p8
 
 # Python
 .venv/
