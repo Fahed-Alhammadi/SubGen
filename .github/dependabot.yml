@@ -1,0 +1,36 @@
+# Dependabot: weekly (Monday) dependency updates, kept quiet on purpose: minor/patch bumps come as ONE grouped PR per
+# folder, major bumps as their own PRs, at most 5 open PRs per folder. Security updates are on in the repo settings.
+# Merging an update only runs CI; nothing is released until a release tag is pushed.
+version: 2
+updates:
+  # Python app (pyproject.toml, exact pins)
+  - package-ecosystem: pip
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "Python deps" }
+    ignore:
+      # torch must match the CUDA in the base image and is only verified on a real GPU: bump both by hand.
+      - dependency-name: torch
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+    groups:
+      python-minor:
+        update-types: [minor, patch]
+
+  # Container base image (nvidia/cuda): CUDA minor/major changes go together with torch, by hand.
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "Image" }
+    ignore:
+      - dependency-name: nvidia/cuda
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+  # GitHub Actions (keeps the commit-SHA pins and their version comments current)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: "CI" }
+    groups:
+      actions:
+        patterns: ["*"]
