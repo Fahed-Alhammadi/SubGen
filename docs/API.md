@@ -267,7 +267,7 @@ keys (so secrets need not be resent).
 
 `GET /api/system` →
 ```json
-{"version": "0.9.0", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
+{"version": "0.9.1", "platform": "Linux-…", "python": "3.12.3", "ffmpeg": "7.0.2",
  "device_mode": "auto", "compute_type": "auto",
  "gpus": [{"name": "NVIDIA RTX 4090", "memory_total": 25757220864, "memory_used": 1200000000}],
  "disks": [{"label": "Models", "path": "/models", "total": 0, "free": 0},
