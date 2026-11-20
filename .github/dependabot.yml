@@ -13,6 +13,9 @@ updates:
       # torch must match the CUDA in the base image and is only verified on a real GPU: bump both by hand.
       - dependency-name: torch
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
+      # torch >= 2.11 on PyPI is built for CUDA 13 (needs host driver 580+); the image is CUDA 12.8.
+      # ruff is pinned to 0.14.5 on purpose (newer versions report 21 old findings; CI installs 0.14.5).
+      - dependency-name: ruff
     groups:
       python-minor:
         update-types: [minor, patch]
