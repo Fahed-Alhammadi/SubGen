@@ -9,7 +9,7 @@ description = "Offline-first subtitle generation for self-hosted media libraries
 requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [
-  "fastapi==0.163.2",
+  "fastapi==0.165.0",
   "uvicorn[standard]==0.54.0",
   "sqlalchemy==2.1.9",
   "pydantic-settings==2.16.3",
